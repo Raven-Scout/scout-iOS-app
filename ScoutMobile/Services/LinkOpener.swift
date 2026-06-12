@@ -8,13 +8,11 @@ enum LinkOpener {
 
     static func open(_ link: TaskDeepLink, linearWorkspace: String) {
         switch link {
-        case .linear(let id):
-            // The Linear app registers the `linear://` scheme.
-            if let native = URL(string: "linear://issue/\(id)"),
-               UIApplication.shared.canOpenURL(native) {
-                UIApplication.shared.open(native)
-                return
-            }
+        case .linear:
+            // Open via the universal link — the Linear app claims
+            // linear.app URLs and navigates straight to the issue. (The
+            // bare `linear://issue/<key>` scheme launches the app but does
+            // not route, so it's useless here.)
             openWebPreferringApp(link.webURL(linearWorkspace: linearWorkspace))
         case .githubPR(_, _, let raw):
             // The GitHub app claims github.com universal links.
