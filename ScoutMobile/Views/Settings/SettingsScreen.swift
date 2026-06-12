@@ -9,6 +9,12 @@ struct SettingsScreen: View {
     @State private var showPicker = false
     @State private var pickError: String?
     @State private var notificationsAuthorized: Bool?
+    @FocusState private var focusedField: Field?
+
+    private enum Field {
+        case linearWorkspace
+        case authorName
+    }
 
     var body: some View {
         NavigationStack {
@@ -32,6 +38,8 @@ struct SettingsScreen: View {
                     TextField("Workspace slug (e.g. acme-co)", text: $settings.linearWorkspace)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .focused($focusedField, equals: .linearWorkspace)
+                        .submitLabel(.done)
                 } header: {
                     Text("Linear")
                 } footer: {
@@ -42,6 +50,8 @@ struct SettingsScreen: View {
                     TextField("Your name", text: $settings.authorName)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .focused($focusedField, equals: .authorName)
+                        .submitLabel(.done)
                 } header: {
                     Text("Authorship")
                 } footer: {
@@ -80,6 +90,13 @@ struct SettingsScreen: View {
                 }
             }
             .navigationTitle("Settings")
+            .scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
+                }
+            }
             .fileImporter(isPresented: $showPicker, allowedContentTypes: [.folder]) { result in
                 switch result {
                 case .success(let url):
