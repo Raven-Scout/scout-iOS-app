@@ -1,73 +1,65 @@
 import SwiftUI
 
-struct ScheduleScreen: View {
-    @EnvironmentObject private var model: AppModel
-
-    var body: some View {
-        ScheduleScreenContent(store: model.schedule)
-    }
-}
-
-struct ScheduleScreenContent: View {
+/// Schedule list content — upcoming fires plus the configured slots. Hosted
+/// inside `ActivityScreen`'s shared `NavigationStack`, so it carries no
+/// navigation chrome of its own.
+struct ScheduleList: View {
     @ObservedObject var store: ScheduleStore
     @State private var typeFilter: SlotType?
 
     var body: some View {
-        NavigationStack {
-            List {
-                if !store.upcoming.isEmpty {
-                    Section("Upcoming") {
-                        ForEach(store.upcoming.prefix(5)) { up in
-                            HStack(spacing: 10) {
-                                Image(systemName: DS.icon(for: up.type))
-                                    .foregroundStyle(DS.color(for: up.type))
-                                    .frame(width: 24)
-                                Text(up.slotKey)
-                                    .font(.subheadline)
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 1) {
-                                    Text(up.scheduledAt.dayLabel)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Text(up.scheduledAt.shortTime)
-                                        .font(.subheadline.monospacedDigit())
-                                }
+        List {
+            if !store.upcoming.isEmpty {
+                Section("Upcoming") {
+                    ForEach(store.upcoming.prefix(5)) { up in
+                        HStack(spacing: 10) {
+                            Image(systemName: DS.icon(for: up.type))
+                                .foregroundStyle(DS.color(for: up.type))
+                                .frame(width: 24)
+                            Text(up.slotKey)
+                                .font(.subheadline)
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 1) {
+                                Text(up.scheduledAt.dayLabel)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(up.scheduledAt.shortTime)
+                                    .font(.subheadline.monospacedDigit())
                             }
-                        }
-                    }
-                }
-
-                Section {
-                    if filteredSlots.isEmpty {
-                        ContentUnavailableView(
-                            "No schedule",
-                            systemImage: "calendar.badge.exclamationmark",
-                            description: Text(store.lastError ?? "No slots found in .scout-state/schedule.yaml.")
-                        )
-                    }
-                    ForEach(filteredSlots) { slot in
-                        SlotRowView(slot: slot)
-                    }
-                } header: {
-                    HStack {
-                        Text("Slots")
-                        Spacer()
-                        Menu {
-                            Button("All types") { typeFilter = nil }
-                            ForEach(SlotType.allCases, id: \.self) { t in
-                                Button(t.displayName) { typeFilter = t }
-                            }
-                        } label: {
-                            Text(typeFilter?.displayName ?? "All")
-                                .font(.caption)
                         }
                     }
                 }
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Schedule")
-            .refreshable { await store.reload() }
+
+            Section {
+                if filteredSlots.isEmpty {
+                    ContentUnavailableView(
+                        "No schedule",
+                        systemImage: "calendar.badge.exclamationmark",
+                        description: Text(store.lastError ?? "No slots found in .scout-state/schedule.yaml.")
+                    )
+                }
+                ForEach(filteredSlots) { slot in
+                    SlotRowView(slot: slot)
+                }
+            } header: {
+                HStack {
+                    Text("Slots")
+                    Spacer()
+                    Menu {
+                        Button("All types") { typeFilter = nil }
+                        ForEach(SlotType.allCases, id: \.self) { t in
+                            Button(t.displayName) { typeFilter = t }
+                        }
+                    } label: {
+                        Text(typeFilter?.displayName ?? "All")
+                            .font(.caption)
+                    }
+                }
+            }
         }
+        .listStyle(.insetGrouped)
+        .refreshable { await store.reload() }
     }
 
     private var filteredSlots: [Slot] {

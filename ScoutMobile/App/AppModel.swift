@@ -16,6 +16,7 @@ final class AppModel: ObservableObject {
     let sessions: SessionsStore
     let schedule: ScheduleStore
     let knowledge: KnowledgeBaseStore
+    let proposals: ProposalsStore
 
     init() {
         let settings = AppSettings.shared
@@ -27,6 +28,7 @@ final class AppModel: ObservableObject {
         self.sessions = SessionsStore(vault: vault)
         self.schedule = ScheduleStore(vault: vault)
         self.knowledge = KnowledgeBaseStore(vault: vault)
+        self.proposals = ProposalsStore(vault: vault)
     }
 
     /// Called from the folder picker once the user grants access.
@@ -46,6 +48,7 @@ final class AppModel: ObservableObject {
         actionItems.stop()
         sessions.stop()
         schedule.stop()
+        proposals.stop()
     }
 
     func handleForeground() {
@@ -65,9 +68,11 @@ final class AppModel: ObservableObject {
             actionItems.start()
             sessions.start()
             schedule.start()
+            proposals.start()
         } else {
             Task { await actionItems.reloadIfChanged() }
             Task { await schedule.reload() }
+            Task { await proposals.reloadIfChanged() }
         }
     }
 }

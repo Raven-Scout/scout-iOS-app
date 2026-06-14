@@ -19,7 +19,7 @@ final class TabWalkUITests: XCTestCase {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 10), "tab bar should appear (vault override active)")
 
-        for tab in ["Today", "Sessions", "Schedule", "Knowledge", "Settings"] {
+        for tab in ["Today", "Activity", "Proposals", "Knowledge", "Settings"] {
             let button = tabBar.buttons[tab]
             XCTAssertTrue(button.waitForExistence(timeout: 5), "\(tab) tab should exist")
             button.tap()
@@ -28,8 +28,8 @@ final class TabWalkUITests: XCTestCase {
             XCTAssertTrue(app.state == .runningForeground, "app should stay alive on \(tab)")
         }
 
-        // Drill into a run row if present (any row labelled like a run type).
-        tabBar.buttons["Sessions"].tap()
+        // Drill into a run row if present (Sessions is the default Activity pane).
+        tabBar.buttons["Activity"].tap()
         sleep(1)
         let runRow = app.staticTexts.matching(
             NSPredicate(format: "label IN %@", ["Morning briefing", "Consolidation", "Dreaming", "Research", "Weekend briefing"])
