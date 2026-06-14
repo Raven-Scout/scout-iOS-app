@@ -42,28 +42,36 @@ enum NotificationService {
         defaults.set(Array(Set(keep).union(fresh.map(\.id))), forKey: seenKey)
     }
 
-    private static func fire(for run: Run) async {
-        let content = UNMutableNotificationContent()
-        content.title = "\(run.displayName) finished"
+    /// Notification body for a finished run. Extracted from `fire` so the
+    /// duration/cost formatting is unit-testable. Duration uses the shared
+    /// `compactDuration`, which rolls long runs into hours (a 10h dreaming run
+    /// reads "10h 1m", not "601m 6s").
+    static func body(for run: Run) -> String {
         switch run.status {
         case .success:
             var body = "Completed successfully"
-            if let d = run.duration { body += " in \(Int(d / 60))m \(Int(d) % 60)s" }
+            if let d = run.duration { body += " in \(d.compactDuration)" }
             if let cost = run.cost, cost > 0 { body += " · $\(cost)" }
-            content.body = body + "."
+            return body + "."
         case .failure:
-            content.body = "Failed (exit code \(run.exitCode.map(String.init) ?? "?"))."
+            return "Failed (exit code \(run.exitCode.map(String.init) ?? "?"))."
         case .timeout:
-            content.body = "Timed out."
+            return "Timed out."
         case .rateLimited:
-            content.body = "Hit a rate limit."
+            return "Hit a rate limit."
         case .skippedBudget:
-            content.body = "Skipped — budget cap reached."
+            return "Skipped — budget cap reached."
         case .skippedConcurrency:
-            content.body = "Skipped — another session was running."
+            return "Skipped — another session was running."
         default:
-            content.body = run.status.displayName + "."
+            return run.status.displayName + "."
         }
+    }
+
+    private static func fire(for run: Run) async {
+        let content = UNMutableNotificationContent()
+        content.title = "\(run.displayName) finished"
+        content.body = body(for: run)
         content.sound = .default
         content.threadIdentifier = "scout-runs"
         content.userInfo = ["runID": run.id]
