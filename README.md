@@ -1,6 +1,6 @@
 # Scout for iOS
 
-An iPhone companion app for the [Scout](https://github.com/jordanrburger/scout-plugin) Claude Code plugin — the iOS sibling of the [Scout macOS app](https://github.com/jordanrburger/Scout).
+An iPhone companion app for the [Scout](https://github.com/Raven-Scout/scout-plugin) Claude Code plugin — the iOS sibling of the [Scout macOS app](https://github.com/Raven-Scout/Scout).
 
 Scout runs as scheduled Claude Code sessions on your Mac and writes everything into a vault folder (markdown + logs). When that vault lives inside your Obsidian iCloud folder, this app reads it on your iPhone:
 
