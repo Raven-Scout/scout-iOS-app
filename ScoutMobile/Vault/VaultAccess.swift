@@ -153,6 +153,52 @@ final class VaultAccess: @unchecked Sendable {
         }
     }
 
+    /// Create a new file with a collision-free name in `directoryRelativePath`,
+    /// creating the directory (and any intermediates) if absent, and write
+    /// `contents`. Returns the new vault-relative path. The base name is
+    /// suffixed (`-2`, `-3`, …) until it does not collide with an existing file
+    /// or its iCloud placeholder. Coordinated atomic write — same hygiene as
+    /// `writeFile`. Used by the per-file Add flow; iOS has no git, so the file
+    /// is simply written and iCloud/Obsidian propagate it.
+    func createUniqueFile(
+        inDirectory directoryRelativePath: String,
+        baseName: String,
+        ext: String = "md",
+        contents: String
+    ) throws -> String {
+        try withVault { root in
+            let dir = directoryRelativePath.isEmpty
+                ? root
+                : root.appendingPathComponent(directoryRelativePath, isDirectory: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+            var name = "\(baseName).\(ext)"
+            var url = dir.appendingPathComponent(name)
+            var n = 2
+            let fm = FileManager.default
+            while fm.fileExists(atPath: url.path)
+                || fm.fileExists(atPath: Self.placeholderURL(for: url).path) {
+                name = "\(baseName)-\(n).\(ext)"
+                url = dir.appendingPathComponent(name)
+                n += 1
+            }
+
+            var coordError: NSError?
+            var writeError: Error?
+            NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forReplacing, error: &coordError) { actualURL in
+                do {
+                    try Data(contents.utf8).write(to: actualURL, options: .atomic)
+                } catch {
+                    writeError = error
+                }
+            }
+            if let coordError { throw coordError }
+            if let writeError { throw writeError }
+
+            return directoryRelativePath.isEmpty ? name : "\(directoryRelativePath)/\(name)"
+        }
+    }
+
     /// Coordinated read-modify-write of a text file. `transform` receives the
     /// current contents and returns the new contents (or nil to abort).
     func modifyTextFile(relativePath: String, transform: (String) throws -> String?) throws {
