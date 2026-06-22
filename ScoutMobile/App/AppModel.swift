@@ -81,8 +81,8 @@ final class AppModel: ObservableObject {
             Task { await actionItems.reloadIfChanged() }
             Task { await schedule.reload() }
             Task { await proposals.reloadIfChanged() }
-            Task { await wishlist.reload() }
-            Task { await research.reload() }
+            Task { await wishlist.reloadIfChanged() }
+            Task { await research.reloadIfChanged() }
         }
     }
 }

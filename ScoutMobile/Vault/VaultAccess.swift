@@ -127,6 +127,38 @@ final class VaultAccess: @unchecked Sendable {
         }) ?? false
     }
 
+    /// A cheap change-detection signature of a directory: sorted
+    /// `name:size:mtime` for each entry, computed from directory metadata
+    /// only (no file-body reads, no forced iCloud downloads). Returns nil when
+    /// the directory does not exist. Used by polling stores to skip a full
+    /// reparse when nothing changed. iCloud placeholders are normalized to
+    /// their real names and contribute the placeholder's own metadata — which
+    /// still changes when the item is edited or materialized, so the signature
+    /// flips and triggers a reload.
+    func directorySignature(relativePath: String) -> String? {
+        try? withVault { root -> String? in
+            let dir = relativePath.isEmpty ? root : root.appendingPathComponent(relativePath, isDirectory: true)
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: dir.path, isDirectory: &isDir), isDir.boolValue else {
+                return nil
+            }
+            let keys: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey]
+            let entries = (try? FileManager.default.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: Array(keys),
+                options: []
+            )) ?? []
+            let parts = entries.map { url -> String in
+                let vals = try? url.resourceValues(forKeys: keys)
+                let name = Self.normalizePlaceholderName(url.lastPathComponent)
+                let size = vals?.fileSize ?? 0
+                let mtime = vals?.contentModificationDate?.timeIntervalSince1970 ?? 0
+                return "\(name):\(size):\(mtime)"
+            }.sorted()
+            return parts.joined(separator: "|")
+        } ?? nil
+    }
+
     /// Looks like a Scout vault? (used to validate the picked folder)
     func looksLikeScoutVault() -> Bool {
         fileExists(relativePath: "action-items") || fileExists(relativePath: "scout-config.yaml")

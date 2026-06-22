@@ -30,6 +30,7 @@ final class PerFileItemsStore: ObservableObject {
 
     private let vault: VaultAccess
     private var refreshTimer: Timer?
+    private var lastSignature: String?
 
     init(vault: VaultAccess, config: PerFileTabConfig) {
         self.vault = vault
@@ -40,7 +41,7 @@ final class PerFileItemsStore: ObservableObject {
         Task { await reload() }
         refreshTimer?.invalidate()
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in await self?.reload() }
+            Task { @MainActor [weak self] in await self?.reloadIfChanged() }
         }
     }
 
@@ -53,21 +54,38 @@ final class PerFileItemsStore: ObservableObject {
         if case .idle = state { state = .loading }
         let directory = config.directory
         let vault = self.vault
-        let result: (state: State, items: [PerFileItem]) = await Task.detached {
+        let result: (state: State, items: [PerFileItem], signature: String?) = await Task.detached {
             Self.load(directory: directory, vault: vault)
         }.value
         state = result.state
         // Avoid redundant publishes (the 30 s tick reparses every time).
         if result.items != items { items = result.items }
+        lastSignature = result.signature
     }
 
-    nonisolated private static func load(directory: String, vault: VaultAccess) -> (state: State, items: [PerFileItem]) {
-        guard vault.fileExists(relativePath: directory) else { return (.missing, []) }
+    /// Cheap polling reload — only do the full reparse when the directory's
+    /// stat signature changed. Falls back to a full reload when we don't yet
+    /// have a baseline (e.g. after `.missing`/`.failed`/`.idle`).
+    func reloadIfChanged() async {
+        guard case .loaded = state, let current = lastSignature else {
+            await reload()
+            return
+        }
+        let directory = config.directory
+        let vault = self.vault
+        let changed = await Task.detached { () -> Bool in
+            vault.directorySignature(relativePath: directory) != current
+        }.value
+        if changed { await reload() }
+    }
+
+    nonisolated private static func load(directory: String, vault: VaultAccess) -> (state: State, items: [PerFileItem], signature: String?) {
+        guard vault.fileExists(relativePath: directory) else { return (.missing, [], nil) }
         let names: [String]
         do {
             names = try vault.listDirectory(relativePath: directory)
         } catch {
-            return (.failed(error.localizedDescription), [])
+            return (.failed(error.localizedDescription), [], nil)
         }
         let items = names
             .filter { $0.hasSuffix(".md") }
@@ -80,7 +98,7 @@ final class PerFileItemsStore: ObservableObject {
                       let text = String(data: data, encoding: .utf8) else { return nil }
                 return PerFileItemParser.parseFile(contents: text, relativePath: rel)
             }
-        return (.loaded, items)
+        return (.loaded, items, vault.directorySignature(relativePath: directory))
     }
 
     // MARK: - Mutations

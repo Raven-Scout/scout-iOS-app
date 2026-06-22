@@ -88,4 +88,51 @@ struct PerFileItemsStoreTests {
         #expect(store.activeCount == 0)
         #expect(store.items.first?.status == .done)
     }
+
+    @Test func reloadIfChangedSkipsWhenUnchangedAndPicksUpChanges() async throws {
+        let (vault, dir) = try makeVault()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let one = """
+        ---
+        title: "First"
+        status: open
+        priority: high
+        date: 2026-06-20
+        ---
+
+        # First
+
+        Body.
+        """
+        try write(one, to: "docs/wishlist/2026-06-20-first.md", vault: vault)
+
+        let store = PerFileItemsStore(vault: vault, config: .wishlist)
+        await store.reload()
+        #expect(store.state == .loaded)
+        #expect(store.items.count == 1)
+        let firstId = try #require(store.items.first?.id)
+
+        // No change on disk → fast-path skips the reparse; items stay identical.
+        await store.reloadIfChanged()
+        #expect(store.items.count == 1)
+        #expect(store.items.first?.id == firstId)
+
+        // External add → the signature flips and the new item shows up.
+        let two = """
+        ---
+        title: "Second"
+        status: open
+        priority: medium
+        date: 2026-06-21
+        ---
+
+        # Second
+
+        Body.
+        """
+        try write(two, to: "docs/wishlist/2026-06-21-second.md", vault: vault)
+        await store.reloadIfChanged()
+        #expect(store.items.count == 2)
+    }
 }
