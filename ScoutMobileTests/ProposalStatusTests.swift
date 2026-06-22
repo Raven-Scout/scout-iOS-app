@@ -43,8 +43,8 @@ struct ProposalStatusTests {
     }
 }
 
-@Suite("ProposalBodyBlock.blocks")
-struct ProposalBodyBlockTests {
+@Suite("MarkdownBodyBlock.blocks")
+struct MarkdownBodyBlockTests {
 
     @Test func splitsProseAndCodePreservingOrder() {
         let body = """
@@ -59,7 +59,7 @@ struct ProposalBodyBlockTests {
 
         That should do it.
         """
-        let blocks = ProposalBodyBlock.blocks(from: body)
+        let blocks = MarkdownBodyBlock.blocks(from: body)
         #expect(blocks.count == 4)
         #expect(blocks[0] == .prose("**Problem.** Something went wrong."))
         #expect(blocks[1] == .prose("Here is a fix:"))
@@ -68,12 +68,12 @@ struct ProposalBodyBlockTests {
     }
 
     @Test func plainProseIsOneBlock() {
-        let blocks = ProposalBodyBlock.blocks(from: "Just one paragraph of text.")
+        let blocks = MarkdownBodyBlock.blocks(from: "Just one paragraph of text.")
         #expect(blocks == [.prose("Just one paragraph of text.")])
     }
 
     @Test func unterminatedFenceKeepsContentAsCode() {
-        let blocks = ProposalBodyBlock.blocks(from: "intro\n\n```\nno closing fence")
+        let blocks = MarkdownBodyBlock.blocks(from: "intro\n\n```\nno closing fence")
         #expect(blocks.contains(.code(language: nil, code: "no closing fence")))
     }
 }

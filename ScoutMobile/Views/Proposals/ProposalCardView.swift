@@ -17,7 +17,7 @@ struct ProposalCardView: View {
         VStack(alignment: .leading, spacing: 10) {
             header
             if !proposal.bodyBlocks.isEmpty {
-                ProposalBodyView(blocks: proposal.bodyBlocks)
+                MarkdownBodyView(blocks: proposal.bodyBlocks)
             }
             if proposal.isAwaitingDecision, onDecide != nil {
                 actions
