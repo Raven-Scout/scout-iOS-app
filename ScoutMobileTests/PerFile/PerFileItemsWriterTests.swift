@@ -103,6 +103,26 @@ struct PerFileItemsWriterE2ETests {
         #expect(!resolved.isActive)
     }
 
+    @Test func addResearchRoutesOptionalToArea() throws {
+        let (vault, dir) = try makeVault()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let rel = try PerFileItemsWriter.addItem(
+            config: .research, title: "PKCE flow", priority: .urgent,
+            body: "Investigate.", optional: "Auth",
+            vault: vault, now: Self.fixedDate())
+
+        let text = String(data: try vault.readFile(relativePath: rel), encoding: .utf8)!
+        let item = try #require(PerFileItemParser.parseFile(contents: text, relativePath: rel))
+        #expect(item.area == "Auth")
+        #expect(item.source == nil)
+        #expect(item.priority == .urgent)
+        #expect(item.status == .open)
+        // Research routes the optional field to `area:`, never `source:`.
+        #expect(text.contains("area: \"Auth\""))
+        #expect(!text.contains("source:"))
+    }
+
     @Test func emptyTitleThrows() throws {
         let (vault, dir) = try makeVault()
         defer { try? FileManager.default.removeItem(at: dir) }
