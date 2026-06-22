@@ -1,22 +1,10 @@
 import SwiftUI
 
-/// The Proposals tab entry point: dreaming-generated SKILL.md change proposals
-/// from `dreaming-proposals.md`. The list body lives in `ProposalsList` so the
-/// "Ideas" container can host it as a pane alongside Wishlist and Research.
-struct ProposalsScreen: View {
-    @EnvironmentObject private var model: AppModel
-
-    var body: some View {
-        NavigationStack {
-            ProposalsList(store: model.proposals)
-                .navigationTitle("Proposals")
-        }
-    }
-}
-
-/// The proposals list content — awaiting items with Approve/Decline and a
-/// collapsible Resolved archive. No navigation chrome of its own; hosted inside
-/// a parent `NavigationStack` (`ProposalsScreen` or `IdeasScreen`).
+/// The proposals pane of the "Ideas" tab: dreaming-generated SKILL.md change
+/// proposals from `dreaming-proposals.md`, shown as awaiting items with
+/// Approve/Decline and a collapsible Resolved archive. No navigation chrome of
+/// its own — `IdeasScreen` hosts it inside its `NavigationStack` alongside the
+/// Wishlist and Research panes.
 struct ProposalsList: View {
     @ObservedObject var store: ProposalsStore
     @State private var resolvedExpanded = false
