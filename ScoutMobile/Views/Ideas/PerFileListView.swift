@@ -36,7 +36,7 @@ struct PerFileListView: View {
                 onCancel: { showingAdd = false }
             )
         }
-        .task { await store.reload() }
+        .task { await store.reloadIfChanged() }
     }
 
     @ViewBuilder

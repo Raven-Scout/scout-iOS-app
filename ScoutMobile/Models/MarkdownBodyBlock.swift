@@ -32,7 +32,7 @@ enum MarkdownBodyBlock: Equatable, Sendable, Identifiable {
         }
 
         for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.hasPrefix("```") {
                 if inCode {
                     blocks.append(.code(language: codeLanguage, code: codeBuffer.joined(separator: "\n")))
@@ -41,7 +41,7 @@ enum MarkdownBodyBlock: Equatable, Sendable, Identifiable {
                     inCode = false
                 } else {
                     flushProse()
-                    let lang = String(trimmed.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+                    let lang = String(trimmed.dropFirst(3)).trimmingCharacters(in: .whitespacesAndNewlines)
                     codeLanguage = lang.isEmpty ? nil : lang
                     inCode = true
                 }
@@ -58,7 +58,7 @@ enum MarkdownBodyBlock: Equatable, Sendable, Identifiable {
     private static func paragraphs(in text: String) -> [String] {
         text.components(separatedBy: "\n")
             .reduce(into: [[String]]()) { acc, line in
-                if line.trimmingCharacters(in: .whitespaces).isEmpty {
+                if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     if acc.last?.isEmpty == false { acc.append([]) }
                 } else {
                     if acc.isEmpty { acc.append([]) }

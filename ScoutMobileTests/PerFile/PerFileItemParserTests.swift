@@ -85,4 +85,37 @@ struct PerFileItemParserTests {
         #expect(item.priority == .urgent)
         #expect(item.isActive)
     }
+
+    @Test func parsesCRLFLineEndings() {
+        // Windows / external-editor CRLF: every line ends in \r\n. The parser
+        // must still recognize the frontmatter, strip the trailing \r from
+        // field values, drop the leading heading, and detect the code fence.
+        let crlf = "---\r\ntitle: \"CRLF item\"\r\nstatus: in-progress\r\npriority: high\r\n"
+            + "date: 2026-06-21\r\n---\r\n\r\n# CRLF item\r\n\r\nBody line.\r\n\r\n```swift\r\nlet x = 1\r\n```\r\n"
+        let item = try! #require(PerFileItemParser.parseFile(
+            contents: crlf, relativePath: "docs/wishlist/2026-06-21-crlf-item.md"))
+        #expect(item.title == "CRLF item")        // no trailing \r left on the value
+        #expect(item.status == .inProgress)        // "in-progress\r" classified correctly
+        #expect(item.priority == .high)
+        #expect(item.date == "2026-06-21")
+        #expect(!item.bodyMarkdown.hasPrefix("# "))  // heading stripped despite \r
+        let code = item.bodyBlocks.compactMap { block -> String? in
+            if case .code(_, let c) = block { return c } else { return nil }
+        }
+        #expect(code.count == 1)                   // fence detected despite \r
+        #expect(code.first?.contains("let x = 1") == true)
+    }
+
+    @Test func unescapesQuotedValuesRoundTrip() {
+        // The writer escapes \ and " in quoted frontmatter; the parser must
+        // reverse it so titles/sources with those characters round-trip.
+        let title = #"He said "hi" \ bye"#
+        let rendered = PerFileItemsWriter.renderItemFile(
+            title: title, status: .open, priority: .medium, date: "2026-06-22",
+            source: #"path\to\"x""#, area: nil, body: "x")
+        let item = try! #require(PerFileItemParser.parseFile(
+            contents: rendered, relativePath: "docs/wishlist/2026-06-22-x.md"))
+        #expect(item.title == title)
+        #expect(item.source == #"path\to\"x""#)
+    }
 }

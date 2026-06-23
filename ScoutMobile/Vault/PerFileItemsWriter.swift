@@ -101,14 +101,14 @@ enum PerFileItemsWriter {
     /// no status field.
     static func rewriteFrontmatterStatus(text: String, newStatusValue: String) throws -> String {
         var lines = text.components(separatedBy: "\n")
-        guard let first = lines.first, first.trimmingCharacters(in: .whitespaces) == "---" else {
+        guard let first = lines.first, first.trimmingCharacters(in: .whitespacesAndNewlines) == "---" else {
             throw WriteError.frontmatterNotFound
         }
         var i = 1
         while i < lines.count {
-            if lines[i].trimmingCharacters(in: .whitespaces) == "---" { break }
+            if lines[i].trimmingCharacters(in: .whitespacesAndNewlines) == "---" { break }
             if let colon = lines[i].firstIndex(of: ":") {
-                let key = lines[i][..<colon].trimmingCharacters(in: .whitespaces).lowercased()
+                let key = lines[i][..<colon].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 if key == "status" {
                     let leading = String(lines[i].prefix(while: { $0 == " " || $0 == "\t" }))
                     lines[i] = "\(leading)status: \(newStatusValue)"

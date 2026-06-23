@@ -24,11 +24,11 @@ enum PerFileItemParser {
     static func splitFrontmatter(_ text: String) -> (frontmatter: String, body: String)? {
         let lines = text.components(separatedBy: "\n")
         guard let first = lines.first,
-              first.trimmingCharacters(in: .whitespaces) == "---" else { return nil }
+              first.trimmingCharacters(in: .whitespacesAndNewlines) == "---" else { return nil }
         var frontmatter: [String] = []
         var i = 1
         while i < lines.count {
-            if lines[i].trimmingCharacters(in: .whitespaces) == "---" {
+            if lines[i].trimmingCharacters(in: .whitespacesAndNewlines) == "---" {
                 let body = i + 1 < lines.count ? lines[(i + 1)...].joined(separator: "\n") : ""
                 return (frontmatter.joined(separator: "\n"), body)
             }
@@ -42,11 +42,11 @@ enum PerFileItemParser {
         var out: [String: String] = [:]
         for line in frontmatter.components(separatedBy: "\n") {
             guard let colon = line.firstIndex(of: ":") else { continue }
-            let key = line[..<colon].trimmingCharacters(in: .whitespaces).lowercased()
+            let key = line[..<colon].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             guard !key.isEmpty else { continue }
-            var value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            var value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespacesAndNewlines)
             if value.count >= 2, value.hasPrefix("\""), value.hasSuffix("\"") {
-                value = String(value.dropFirst().dropLast())
+                value = unescapeQuoted(String(value.dropFirst().dropLast()))
             }
             out[key] = value
         }
@@ -55,7 +55,7 @@ enum PerFileItemParser {
 
     static func stripLeadingHeading(_ body: String) -> String {
         var lines = body.components(separatedBy: "\n")
-        while let first = lines.first, first.trimmingCharacters(in: .whitespaces).isEmpty {
+        while let first = lines.first, first.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             lines.removeFirst()
         }
         if let first = lines.first, first.hasPrefix("# "), !first.hasPrefix("## ") {
@@ -69,6 +69,27 @@ enum PerFileItemParser {
         let ns = stem as NSString
         guard let m = re.firstMatch(in: stem, range: NSRange(location: 0, length: ns.length)) else { return nil }
         return ns.substring(with: m.range)
+    }
+
+    /// Reverse the writer's YAML double-quote escaping (`\\` → `\`, `\"` → `"`),
+    /// scanning left-to-right so a backslash always consumes the next character
+    /// literally. Applied only to quoted values — the only ones the writer escapes.
+    static func unescapeQuoted(_ s: String) -> String {
+        var out = ""
+        out.reserveCapacity(s.count)
+        var escaped = false
+        for ch in s {
+            if escaped {
+                out.append(ch)
+                escaped = false
+            } else if ch == "\\" {
+                escaped = true
+            } else {
+                out.append(ch)
+            }
+        }
+        if escaped { out.append("\\") }  // trailing lone backslash — keep it
+        return out
     }
 }
 
