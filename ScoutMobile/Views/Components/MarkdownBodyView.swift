@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// Renders a proposal body as a vertical stack of prose paragraphs (inline
+/// Renders a markdown body as a vertical stack of prose paragraphs (inline
 /// markdown) and verbatim code panels. Keeps the dense bold-label-and-code
 /// proposal text readable instead of collapsing it into one wall.
-struct ProposalBodyView: View {
-    let blocks: [ProposalBodyBlock]
+struct MarkdownBodyView: View {
+    let blocks: [MarkdownBodyBlock]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {

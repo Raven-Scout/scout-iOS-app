@@ -1,32 +1,20 @@
 import SwiftUI
 
-/// The Proposals tab: dreaming-generated SKILL.md change proposals from
-/// `dreaming-proposals.md`, with Approve / Decline actions on the ones still
-/// awaiting a decision and a collapsible archive of resolved ones.
-///
-/// Approve/Decline only flips the proposal's `**Status:**` line in the file —
-/// the next dreaming run is what actually applies the SKILL.md change.
-struct ProposalsScreen: View {
-    @EnvironmentObject private var model: AppModel
-
-    var body: some View {
-        ProposalsScreenContent(store: model.proposals)
-    }
-}
-
-struct ProposalsScreenContent: View {
+/// The proposals pane of the "Ideas" tab: dreaming-generated SKILL.md change
+/// proposals from `dreaming-proposals.md`, shown as awaiting items with
+/// Approve/Decline and a collapsible Resolved archive. No navigation chrome of
+/// its own — `IdeasScreen` hosts it inside its `NavigationStack` alongside the
+/// Wishlist and Research panes.
+struct ProposalsList: View {
     @ObservedObject var store: ProposalsStore
     @State private var resolvedExpanded = false
 
     var body: some View {
-        NavigationStack {
-            List {
-                content
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Proposals")
-            .refreshable { await store.reload() }
+        List {
+            content
         }
+        .listStyle(.insetGrouped)
+        .refreshable { await store.reload() }
     }
 
     @ViewBuilder

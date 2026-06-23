@@ -127,6 +127,38 @@ final class VaultAccess: @unchecked Sendable {
         }) ?? false
     }
 
+    /// A cheap change-detection signature of a directory: sorted
+    /// `name:size:mtime` for each entry, computed from directory metadata
+    /// only (no file-body reads, no forced iCloud downloads). Returns nil when
+    /// the directory does not exist. Used by polling stores to skip a full
+    /// reparse when nothing changed. iCloud placeholders are normalized to
+    /// their real names and contribute the placeholder's own metadata — which
+    /// still changes when the item is edited or materialized, so the signature
+    /// flips and triggers a reload.
+    func directorySignature(relativePath: String) -> String? {
+        try? withVault { root -> String? in
+            let dir = relativePath.isEmpty ? root : root.appendingPathComponent(relativePath, isDirectory: true)
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: dir.path, isDirectory: &isDir), isDir.boolValue else {
+                return nil
+            }
+            let keys: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey]
+            let entries = (try? FileManager.default.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: Array(keys),
+                options: []
+            )) ?? []
+            let parts = entries.map { url -> String in
+                let vals = try? url.resourceValues(forKeys: keys)
+                let name = Self.normalizePlaceholderName(url.lastPathComponent)
+                let size = vals?.fileSize ?? 0
+                let mtime = vals?.contentModificationDate?.timeIntervalSince1970 ?? 0
+                return "\(name):\(size):\(mtime)"
+            }.sorted()
+            return parts.joined(separator: "|")
+        } ?? nil
+    }
+
     /// Looks like a Scout vault? (used to validate the picked folder)
     func looksLikeScoutVault() -> Bool {
         fileExists(relativePath: "action-items") || fileExists(relativePath: "scout-config.yaml")
@@ -150,6 +182,52 @@ final class VaultAccess: @unchecked Sendable {
             }
             if let coordError { throw coordError }
             if let writeError { throw writeError }
+        }
+    }
+
+    /// Create a new file with a collision-free name in `directoryRelativePath`,
+    /// creating the directory (and any intermediates) if absent, and write
+    /// `contents`. Returns the new vault-relative path. The base name is
+    /// suffixed (`-2`, `-3`, …) until it does not collide with an existing file
+    /// or its iCloud placeholder. Coordinated atomic write — same hygiene as
+    /// `writeFile`. Used by the per-file Add flow; iOS has no git, so the file
+    /// is simply written and iCloud/Obsidian propagate it.
+    func createUniqueFile(
+        inDirectory directoryRelativePath: String,
+        baseName: String,
+        ext: String = "md",
+        contents: String
+    ) throws -> String {
+        try withVault { root in
+            let dir = directoryRelativePath.isEmpty
+                ? root
+                : root.appendingPathComponent(directoryRelativePath, isDirectory: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+            var name = "\(baseName).\(ext)"
+            var url = dir.appendingPathComponent(name)
+            var n = 2
+            let fm = FileManager.default
+            while fm.fileExists(atPath: url.path)
+                || fm.fileExists(atPath: Self.placeholderURL(for: url).path) {
+                name = "\(baseName)-\(n).\(ext)"
+                url = dir.appendingPathComponent(name)
+                n += 1
+            }
+
+            var coordError: NSError?
+            var writeError: Error?
+            NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forReplacing, error: &coordError) { actualURL in
+                do {
+                    try Data(contents.utf8).write(to: actualURL, options: .atomic)
+                } catch {
+                    writeError = error
+                }
+            }
+            if let coordError { throw coordError }
+            if let writeError { throw writeError }
+
+            return directoryRelativePath.isEmpty ? name : "\(directoryRelativePath)/\(name)"
         }
     }
 
