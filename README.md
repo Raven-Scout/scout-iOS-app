@@ -72,3 +72,15 @@ ScoutMobile/
 ScoutMobileTests/      # unit tests + shared fixtures (parser corpus, real logs)
 ScoutMobileUITests/    # tab-walk smoke test with screenshots
 ```
+
+## License & legal
+
+This app is open-source under the [MIT License](LICENSE).
+
+Scout is local-first and collects no data of its own — the iOS app reads and writes a vault folder you choose (typically inside your own iCloud Drive / Obsidian), and sync happens between your own devices via your iCloud. See the project's shared legal documents:
+
+- **Privacy Policy** — https://raven-scout.github.io/scout-plugin/privacy.html
+- **Terms of Use** — https://raven-scout.github.io/scout-plugin/terms.html
+- **[Security Policy](https://github.com/Raven-Scout/.github/blob/main/SECURITY.md)** · **[Code of Conduct](https://github.com/Raven-Scout/.github/blob/main/CODE_OF_CONDUCT.md)**
+
+Scout is an independent project, not affiliated with Anthropic, Microsoft, Keboola, or any other company.
