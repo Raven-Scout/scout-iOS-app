@@ -1,14 +1,15 @@
 import SwiftUI
 
 /// The Wishlist / Research pane: active items (priority-sorted) with Done/Drop,
-/// a collapsible Resolved archive, and a ＋ toolbar button that presents
-/// `AddItemSheet`. Hosted inside `IdeasScreen`'s shared `NavigationStack`, so it
-/// carries no navigation chrome of its own beyond the toolbar ＋.
+/// and a collapsible Resolved archive. Hosted inside `IdeasScreen`'s shared
+/// `NavigationStack`, it carries no navigation chrome of its own — the ＋ Add
+/// button and its sheet are owned by `IdeasScreen` (keeping the toolbar button at
+/// a stable level so it isn't re-created on pane switches, which otherwise makes
+/// it need two taps).
 struct PerFileListView: View {
     @ObservedObject var store: PerFileItemsStore
 
     @State private var resolvedExpanded = false
-    @State private var showingAdd = false
 
     var body: some View {
         List {
@@ -16,26 +17,6 @@ struct PerFileListView: View {
         }
         .listStyle(.insetGrouped)
         .refreshable { await store.reload() }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingAdd = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .accessibilityLabel("Add \(store.config.addNoun)")
-            }
-        }
-        .sheet(isPresented: $showingAdd) {
-            AddItemSheet(
-                config: store.config,
-                onSubmit: { title, priority, body, optional in
-                    try await store.addItem(title: title, priority: priority, body: body, optional: optional)
-                    showingAdd = false
-                },
-                onCancel: { showingAdd = false }
-            )
-        }
         .task { await store.reloadIfChanged() }
     }
 
