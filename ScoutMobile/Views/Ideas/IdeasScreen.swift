@@ -15,11 +15,13 @@ import SwiftUI
 ///    `ActivityScreen`'s two are too short to notice). `ActivityScreen` gets this
 ///    stability for free from its real `Run` destination; Ideas has no detail
 ///    navigation, so it registers a no-op one.
-///  - The ＋ Add button and its sheet live here, at the same level as the
-///    destination — not inside the swapped `PerFileListView`. A toolbar button
-///    inside the content that's torn down/rebuilt on each pane switch has its
-///    hit-test frame corrupted on first tap (the "needs two taps" bug); keeping
-///    it at this stable level, presented via `.sheet(item:)`, avoids that.
+///  - The ＋ Add button and its sheet live here (not inside the swapped
+///    `PerFileListView`), presented via `.sheet(item:)`. Its label is a
+///    `Label(…).labelStyle(.iconOnly)`, NOT a bare `Image`: on iOS 26 a
+///    bare-`Image` toolbar button has a shrunken hit target, so taps landing in
+///    the padding around the glyph are dropped and the ＋ appears to "need two
+///    taps". The `Label` restores the full tappable area (and supplies the
+///    accessibility label for free).
 struct IdeasScreen: View {
     @EnvironmentObject private var model: AppModel
     @State private var pane: Pane = .proposals
@@ -71,9 +73,13 @@ struct IdeasScreen: View {
                         Button {
                             addingStore = store
                         } label: {
-                            Image(systemName: "plus")
+                            // Label (not a bare Image): on iOS 26 an Image-only
+                            // toolbar button has a shrunken hit target, so taps in
+                            // the padding are dropped — the "＋ needs two taps" bug.
+                            // .iconOnly keeps the glyph-only look + adds the a11y label.
+                            Label("Add \(store.config.addNoun)", systemImage: "plus")
+                                .labelStyle(.iconOnly)
                         }
-                        .accessibilityLabel("Add \(store.config.addNoun)")
                     }
                 }
             }
