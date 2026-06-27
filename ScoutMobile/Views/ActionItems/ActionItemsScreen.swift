@@ -155,14 +155,18 @@ struct ActionItemsScreenContent: View {
             Button {
                 shiftDay(-1)
             } label: {
-                Image(systemName: "chevron.left")
+                // Label (not a bare Image): iOS 26 shrinks the hit target of an
+                // Image-only toolbar button, dropping taps near the glyph edge.
+                Label("Previous day", systemImage: "chevron.left")
+                    .labelStyle(.iconOnly)
             }
         }
         ToolbarItem(placement: .topBarTrailing) {
             Button {
                 shiftDay(1)
             } label: {
-                Image(systemName: "chevron.right")
+                Label("Next day", systemImage: "chevron.right")
+                    .labelStyle(.iconOnly)
             }
             .disabled(Calendar.current.isDateInToday(store.selectedDate))
         }
@@ -179,7 +183,8 @@ struct ActionItemsScreenContent: View {
                     Label("Pick date…", systemImage: "calendar")
                 }
             } label: {
-                Image(systemName: statusFilter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                Label("Filter", systemImage: statusFilter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                    .labelStyle(.iconOnly)
             }
         }
     }
