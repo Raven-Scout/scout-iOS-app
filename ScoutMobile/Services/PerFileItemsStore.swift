@@ -10,7 +10,9 @@ import Combine
 /// and a 30 s timer — mirroring `ProposalsStore`. Each `*.md` file is one item;
 /// files without frontmatter (index/readme files) parse to nil and are skipped.
 @MainActor
-final class PerFileItemsStore: ObservableObject {
+final class PerFileItemsStore: ObservableObject, Identifiable {
+    // `Identifiable` (free `id` via ObjectIdentifier for classes) lets IdeasScreen
+    // drive its Add sheet with `.sheet(item:)`.
 
     enum State: Equatable {
         case idle

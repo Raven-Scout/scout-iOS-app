@@ -80,6 +80,59 @@ shows spurious errors like *"Cannot find type 'Run' in scope"* / *"No such modul
   via `NSFileCoordinator`, re-locating the task by its stable `[#TAG]` prefix rather
   than trusting parse-time line numbers (Scout rewrites files between parses).
 
+## SwiftUI nav-bar gotchas (segmented picker + toolbar buttons)
+
+Both of these bit us hard on the Ideas tab (`Views/Ideas/IdeasScreen.swift`).
+`ActivityScreen` is the reference for "doing it right" — copy its shape for any
+new tab with a nav-bar segmented control.
+
+- **A segmented `Picker` in `ToolbarItem(placement: .principal)` collapses its
+  segments onto one spot for a frame on every selection change UNLESS the
+  `NavigationStack` registers a `.navigationDestination(...)`.** Without one, the
+  stack destructively re-lays-out the principal item when the content swaps,
+  re-running the bridged `UISegmentedControl` layout. It's only *visible* with ≥3
+  segments — two short ones (Sessions/Schedule) reflow imperceptibly, which is the
+  only reason `ActivityScreen` looked fine. `ActivityScreen` is stable because it
+  registers a real `Run` destination; `IdeasScreen` has no detail navigation so it
+  registers a **no-op** `navigationDestination(for: IdeasNoNavigation.self)`. Add a
+  destination to any new segmented-picker-in-the-nav-bar screen. The defect is in
+  UIKit's nav-bar title compatibility path (`_UITAMICAdaptorView`; Apple DTS
+  forum 712461), so SwiftUI-layer fixes do **not** work — `.id()`,
+  `.animation(nil)`, `Transaction(disablesAnimations:)`, `.fixedSize()`, a fixed
+  `.frame(width:)`, or a constant title all still glitch, and even a
+  UIViewRepresentable-hosted `UISegmentedControl` collapses (it's re-created on
+  each content swap). Don't reach for a hand-rolled custom segmented control —
+  the `navigationDestination` keeps the real system control.
+
+- **A `ToolbarItem` button hosted *inside* a view that gets swapped out on a pane
+  switch needs two taps** — the first is absorbed because the button's hit-test
+  frame is corrupted while the bar re-lays out (separate Apple defect; SO 63540602).
+  Keep toolbar buttons and their `.sheet` at the stable `NavigationStack` level,
+  not in the swapped child, and present with `.sheet(item:)`. This is why
+  `IdeasScreen` owns the ＋ Add button/sheet rather than `PerFileListView`.
+
+## Verifying one-frame UI glitches
+
+Sub-second SwiftUI glitches don't show up in unit tests and are easy to misjudge.
+Drive the interaction from a throwaway UITest (set `SCOUT_VAULT_PATH` in
+`app.launchEnvironment`, tap with `sleep`s between taps; make tappable controls
+real `Button`s so XCUITest can find them), record the sim, and frame-step:
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode-26.5.0.app/Contents/Developer
+xcrun simctl io "iPhone 17 Pro" recordVideo --codec h264 --force out.mov &   # SIGINT (kill -INT) to finalize the .mov
+# run the probe with `xcodebuild test-without-building -only-testing:...` while it records, then stop the recording
+ffmpeg -i out.mov -vf "crop=in_w:in_h*0.085:0:in_h*0.045,select='gt(scene,0.012)'" -vsync vfr f_%03d.png
+```
+
+Judge by the **full-resolution frames**, never a frame *count* — scene-change
+counts are confounded by the nav title and selection highlight changing, which
+burned us with false positives/negatives. Two more traps: a UITest that fails
+early (short recording) looks "glitch-free" because no transition happened —
+always confirm the panes actually switched; and XCUITest's synthetic taps can't
+reproduce real-device "first tap absorbed" (double-tap) bugs — those need a
+physical device to verify.
+
 ## Debugging against real data
 
 The live vault is readable on this Mac for diagnosing parsing/format bugs against actual
