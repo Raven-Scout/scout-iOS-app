@@ -34,7 +34,7 @@ final class ScheduleStore: ObservableObject {
 
     func reload() async {
         let vault = self.vault
-        let result = await Task.detached { () -> Result<[Slot], Error> in
+        let result = await vault.performIO { () -> Result<[Slot], Error> in
             do {
                 let data = try vault.readFile(relativePath: ".scout-state/schedule.yaml")
                 let text = String(data: data, encoding: .utf8) ?? ""
@@ -42,7 +42,7 @@ final class ScheduleStore: ObservableObject {
             } catch {
                 return .failure(error)
             }
-        }.value
+        }
         switch result {
         case .success(let parsed):
             slots = parsed

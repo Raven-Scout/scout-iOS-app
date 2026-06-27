@@ -27,7 +27,7 @@ final class KnowledgeBaseStore: ObservableObject {
 
     func loadEntries(at relativePath: String) async {
         let vault = self.vault
-        let result = await Task.detached { () -> Result<[Entry], Error> in
+        let result = await vault.performIO { () -> Result<[Entry], Error> in
             do {
                 let names = try vault.listDirectory(relativePath: relativePath)
                 var out: [Entry] = []
@@ -53,7 +53,7 @@ final class KnowledgeBaseStore: ObservableObject {
             } catch {
                 return .failure(error)
             }
-        }.value
+        }
         switch result {
         case .success(let entries):
             entriesByPath[relativePath] = entries
@@ -65,10 +65,10 @@ final class KnowledgeBaseStore: ObservableObject {
 
     func readMarkdown(relativePath: String) async -> String? {
         let vault = self.vault
-        return await Task.detached { () -> String? in
+        return await vault.performIO { () -> String? in
             guard let data = vault.readFileIfExists(relativePath: relativePath) else { return nil }
             return String(data: data, encoding: .utf8)
-        }.value
+        }
     }
 
     /// Resolve a `[[wikilink]]` target to a vault-relative markdown path by
@@ -77,10 +77,10 @@ final class KnowledgeBaseStore: ObservableObject {
     func resolveWikilink(_ target: String) async -> String? {
         let vault = self.vault
         let fileName = target.hasSuffix(".md") ? target : "\(target).md"
-        return await Task.detached { () -> String? in
+        return await vault.performIO { () -> String? in
             Self.findFile(named: fileName, under: "knowledge-base", vault: vault, depth: 3)
                 ?? Self.findFile(named: fileName, under: "", vault: vault, depth: 1)
-        }.value
+        }
     }
 
     nonisolated private static func findFile(named fileName: String, under dir: String, vault: VaultAccess, depth: Int) -> String? {

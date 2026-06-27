@@ -53,9 +53,9 @@ final class ProposalsStore: ObservableObject {
         if case .idle = state { state = .loading }
         let path = relativePath
         let vault = self.vault
-        let result: (state: State, proposals: [Proposal], bytes: Int?) = await Task.detached {
+        let result: (state: State, proposals: [Proposal], bytes: Int?) = await vault.performIO {
             Self.load(path: path, vault: vault)
-        }.value
+        }
         state = result.state
         proposals = result.proposals
         lastBytes = result.bytes
@@ -69,10 +69,10 @@ final class ProposalsStore: ObservableObject {
         }
         let path = relativePath
         let vault = self.vault
-        let changed = await Task.detached { () -> Bool in
+        let changed = await vault.performIO {
             guard let data = vault.readFileIfExists(relativePath: path) else { return true }
             return data.count != currentBytes
-        }.value
+        }
         if changed { await reload() }
     }
 
@@ -96,9 +96,9 @@ final class ProposalsStore: ObservableObject {
     func decide(_ decision: ProposalDecision, proposal: Proposal) async throws {
         let path = relativePath
         let vault = self.vault
-        try await Task.detached {
+        try await vault.performIO {
             try ProposalsWriter.decide(decision, proposal: proposal, in: path, vault: vault)
-        }.value
+        }
         await reload()
     }
 }

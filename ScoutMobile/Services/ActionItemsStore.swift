@@ -58,9 +58,9 @@ final class ActionItemsStore: ObservableObject {
         let path = selectedRelativePath
         let vault = self.vault
         let author = settings.authorName
-        let result: State = await Task.detached { () -> State in
+        let result: State = await vault.performIO {
             Self.load(path: path, vault: vault, author: author)
-        }.value
+        }
         state = result
         refreshAvailableDates()
     }
@@ -74,10 +74,10 @@ final class ActionItemsStore: ObservableObject {
         let path = selectedRelativePath
         let vault = self.vault
         let currentBytes = doc.sourceBytes
-        let changed = await Task.detached { () -> Bool in
+        let changed = await vault.performIO {
             guard let data = vault.readFileIfExists(relativePath: path) else { return true }
             return data.count != currentBytes
-        }.value
+        }
         if changed { await reload() }
     }
 
@@ -103,16 +103,16 @@ final class ActionItemsStore: ObservableObject {
 
     private func refreshAvailableDates() {
         let vault = self.vault
-        Task.detached { [weak self] in
-            guard let names = try? vault.listDirectory(relativePath: "action-items") else { return }
+        Task { [weak self] in
+            let names = await vault.performIO {
+                (try? vault.listDirectory(relativePath: "action-items")) ?? []
+            }
             let dates = names.compactMap { name -> Date? in
                 guard name.hasPrefix("action-items-"), name.hasSuffix(".md") else { return nil }
                 let stem = String(name.dropFirst("action-items-".count).dropLast(3))
                 return ActionItemsParser.dayFormatter.date(from: stem)
             }.sorted()
-            await MainActor.run { [weak self] in
-                self?.availableDates = dates
-            }
+            self?.availableDates = dates
         }
     }
 
@@ -121,18 +121,18 @@ final class ActionItemsStore: ObservableObject {
     func setDone(_ task: ActionTask, done: Bool) async throws {
         let path = selectedRelativePath
         let vault = self.vault
-        try await Task.detached {
+        try await vault.performIO {
             try ActionItemsWriter.markDone(task, done: done, in: path, vault: vault)
-        }.value
+        }
         await reload()
     }
 
     func snooze(_ task: ActionTask, until: Date, fromKind: ActionSection.Kind?) async throws {
         let path = selectedRelativePath
         let vault = self.vault
-        try await Task.detached {
+        try await vault.performIO {
             try ActionItemsWriter.snooze(task, until: until, fromKind: fromKind, in: path, vault: vault)
-        }.value
+        }
         await reload()
     }
 
@@ -140,9 +140,9 @@ final class ActionItemsStore: ObservableObject {
         let path = selectedRelativePath
         let vault = self.vault
         let author = settings.authorName
-        try await Task.detached {
+        try await vault.performIO {
             try ActionItemsWriter.addComment(task, author: author, text: text, in: path, vault: vault)
-        }.value
+        }
         await reload()
     }
 }
