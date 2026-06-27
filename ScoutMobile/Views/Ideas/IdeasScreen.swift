@@ -92,5 +92,6 @@ struct IdeasScreen: View {
 }
 
 /// Uninhabited marker type for `IdeasScreen`'s no-op `navigationDestination`
-/// (see `IdeasScreen`). No value is ever created, so the destination never shows.
-private struct IdeasNoNavigation: Hashable {}
+/// (see `IdeasScreen`). A caseless `enum` has no instances, so the destination is
+/// impossible to trigger — only its registration matters.
+private enum IdeasNoNavigation: Hashable {}
