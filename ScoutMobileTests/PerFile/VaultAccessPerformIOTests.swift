@@ -29,10 +29,16 @@ struct VaultAccessPerformIOTests {
         }
     }
 
+    @MainActor
     @Test func runsOffTheCallingThread() async throws {
+        // Pin the caller to the main actor so the contract is actually exercised:
+        // without @MainActor, Swift Testing may already run the test off-main and
+        // the assertion below would pass trivially. (`Thread.isMainThread` can't be
+        // read directly here — it's unavailable from async contexts — but the
+        // @MainActor isolation guarantees this prologue runs on the main thread.)
         let vault = try makeVault()
-        // Called from the main actor; the blocking work must not run on the main
-        // thread (that is the whole point of routing through the dedicated queue).
+        // The blocking work must not run on the main thread (that is the whole
+        // point of routing through the dedicated queue).
         let ranOnMain = await vault.performIO { Thread.isMainThread }
         #expect(ranOnMain == false)
     }

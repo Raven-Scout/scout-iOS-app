@@ -33,8 +33,12 @@ enum BackgroundRefresh {
                 return
             }
             let runs = await vault.performIO { SessionsStore.loadAll(vault: vault).runs }
+            // The expirationHandler may have already completed the task (cancellation
+            // is cooperative, so this body keeps running); bail before completing again.
+            if Task.isCancelled { return }
             let settings = await MainActor.run { AppSettings.shared }
             await NotificationService.processRuns(runs, settings: settings)
+            if Task.isCancelled { return }
             task.setTaskCompleted(success: true)
         }
 
