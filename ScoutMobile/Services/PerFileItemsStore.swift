@@ -54,9 +54,9 @@ final class PerFileItemsStore: ObservableObject {
         if case .idle = state { state = .loading }
         let directory = config.directory
         let vault = self.vault
-        let result: (state: State, items: [PerFileItem], signature: String?) = await Task.detached {
+        let result: (state: State, items: [PerFileItem], signature: String?) = await vault.performIO {
             Self.load(directory: directory, vault: vault)
-        }.value
+        }
         state = result.state
         // Avoid redundant publishes (the 30 s tick reparses every time).
         if result.items != items { items = result.items }
@@ -73,9 +73,9 @@ final class PerFileItemsStore: ObservableObject {
         }
         let directory = config.directory
         let vault = self.vault
-        let changed = await Task.detached { () -> Bool in
+        let changed = await vault.performIO {
             vault.directorySignature(relativePath: directory) != current
-        }.value
+        }
         if changed { await reload() }
     }
 
@@ -106,18 +106,18 @@ final class PerFileItemsStore: ObservableObject {
     func addItem(title: String, priority: ItemPriority, body: String, optional: String?) async throws {
         let config = self.config
         let vault = self.vault
-        try await Task.detached {
+        try await vault.performIO {
             _ = try PerFileItemsWriter.addItem(config: config, title: title, priority: priority,
                                                body: body, optional: optional, vault: vault)
-        }.value
+        }
         await reload()
     }
 
     func resolve(_ resolution: ItemResolution, item: PerFileItem) async throws {
         let vault = self.vault
-        try await Task.detached {
+        try await vault.performIO {
             try PerFileItemsWriter.resolve(resolution, item: item, vault: vault)
-        }.value
+        }
         await reload()
     }
 }

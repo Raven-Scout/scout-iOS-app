@@ -57,8 +57,40 @@ final class VaultAccess: @unchecked Sendable {
 
     private let defaults: UserDefaults
 
+    /// Dedicated queue for the blocking file I/O below. `NSFileCoordinator`
+    /// coordination and `ensureDownloaded(_:)` block their thread — the latter
+    /// `Thread.sleep`s up to 15 s waiting on iCloud. Running that on the Swift
+    /// cooperative thread pool (via `Task.detached`) fires "unsafeForcedSync
+    /// called from Swift Concurrent context" and risks priority inversion / pool
+    /// starvation, so all such work is funneled here. Concurrent so a slow
+    /// download for one file does not stall unrelated reads.
+    private let ioQueue = DispatchQueue(
+        label: "com.scout.mobile.vault-io",
+        qos: .userInitiated,
+        attributes: .concurrent
+    )
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+    }
+
+    // MARK: - Async I/O bridge
+
+    /// Run blocking vault I/O on the dedicated `ioQueue`, bridged to async.
+    /// Use this from `@MainActor` stores instead of `Task.detached` so the
+    /// blocking `NSFileCoordinator`/`ensureDownloaded` work never lands on the
+    /// cooperative thread pool. Non-throwing overload.
+    func performIO<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await withCheckedContinuation { continuation in
+            ioQueue.async { continuation.resume(returning: work()) }
+        }
+    }
+
+    /// Throwing variant of `performIO` for write/mutation work that can fail.
+    func performIO<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            ioQueue.async { continuation.resume(with: Result { try work() }) }
+        }
     }
 
     /// Resolve the bookmark to a URL. The caller must wrap actual file access

@@ -35,9 +35,9 @@ final class SessionsStore: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         let vault = self.vault
-        let result = await Task.detached { () -> (runs: [Run], usage: [UsageEntry], error: String?) in
+        let result = await vault.performIO {
             Self.loadAll(vault: vault)
-        }.value
+        }
         runs = result.runs
         usageEntries = result.usage
         lastError = result.error
@@ -47,10 +47,10 @@ final class SessionsStore: ObservableObject {
     func logText(for run: Run) async -> String {
         let vault = self.vault
         let path = "\(Self.logsDir)/\(run.logPath.lastPathComponent)"
-        return await Task.detached { () -> String in
+        return await vault.performIO {
             guard let data = vault.readFileIfExists(relativePath: path) else { return "(log unavailable)" }
             return String(data: data, encoding: .utf8) ?? "(log is not valid UTF-8)"
-        }.value
+        }
     }
 
     nonisolated static let logsDir = ".scout-logs"

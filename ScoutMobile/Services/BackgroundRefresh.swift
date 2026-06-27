@@ -32,7 +32,7 @@ enum BackgroundRefresh {
                 task.setTaskCompleted(success: true)
                 return
             }
-            let (runs, _, _) = SessionsStore.loadAll(vault: vault)
+            let runs = await vault.performIO { SessionsStore.loadAll(vault: vault).runs }
             let settings = await MainActor.run { AppSettings.shared }
             await NotificationService.processRuns(runs, settings: settings)
             task.setTaskCompleted(success: true)
