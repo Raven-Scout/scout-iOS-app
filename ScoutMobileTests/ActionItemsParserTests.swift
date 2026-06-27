@@ -50,13 +50,13 @@ struct ActionItemsParserTests {
 
     @Test func detectsDeepLinks() {
         let links = ActionItemsParser.detectDeepLinks(
-            in: "Check AI-3026 and https://github.com/keboola/ui/pull/6218 plus https://keboola.slack.com/archives/C094NK1JPJB/p1781253153112749"
+            in: "Check PROJ-3026 and https://github.com/example-org/example-repo/pull/6218 plus https://example.slack.com/archives/C0123456789/p1700000000000000"
         )
         #expect(links.count == 3)
         guard case .linear(let id) = links[0] else { Issue.record("expected linear first"); return }
-        #expect(id == "AI-3026")
+        #expect(id == "PROJ-3026")
         guard case .githubPR(let repo, let n, _) = links[1] else { Issue.record("expected github PR"); return }
-        #expect(repo == "keboola/ui")
+        #expect(repo == "example-org/example-repo")
         #expect(n == 6218)
         guard case .slackThread = links[2] else { Issue.record("expected slack thread"); return }
     }
@@ -86,8 +86,8 @@ struct ActionItemsParserTests {
 
         ## 🟡 To Do
         - [ ] [#CM01] **Commented task** — has feedback
-          > adam (2026-06-01 9:15 AM): blockquote comment
-          - adam: sub-bullet comment
+          > alex (2026-06-01 9:15 AM): blockquote comment
+          - alex: sub-bullet comment
         """
         let doc = try ActionItemsParser.parse(
             text: text,
@@ -96,7 +96,7 @@ struct ActionItemsParserTests {
         )
         let task = try #require(doc.sections.first?.tasks.first)
         #expect(task.comments.count == 2)
-        #expect(task.comments[0].author == "adam")
+        #expect(task.comments[0].author == "alex")
         #expect(task.comments[0].timestamp == "2026-06-01 9:15 AM")
         #expect(task.comments[1].text == "sub-bullet comment")
     }

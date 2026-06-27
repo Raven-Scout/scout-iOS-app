@@ -96,14 +96,14 @@ struct WriterIntegrationTests {
         var doc = try parse(vault)
         let task = try #require(doc.sections.flatMap(\.tasks).first { $0.shortPrefix == "AB12" })
 
-        try ActionItemsWriter.addComment(task, author: "adam", text: "checked this", in: path, vault: vault)
+        try ActionItemsWriter.addComment(task, author: "alex", text: "checked this", in: path, vault: vault)
         doc = try parse(vault)
         let after = try #require(doc.sections.flatMap(\.tasks).first { $0.shortPrefix == "AB12" })
-        #expect(after.comments.contains { $0.author == "adam" && $0.text == "checked this" })
+        #expect(after.comments.contains { $0.author == "alex" && $0.text == "checked this" })
 
         // Comment must land under AB12's block, before CD34.
         let text = String(data: try vault.readFile(relativePath: path), encoding: .utf8)!
-        let commentIdx = try #require(text.range(of: "- adam: checked this")?.lowerBound)
+        let commentIdx = try #require(text.range(of: "- alex: checked this")?.lowerBound)
         let cd34Idx = try #require(text.range(of: "[#CD34]")?.lowerBound)
         #expect(commentIdx < cd34Idx)
     }

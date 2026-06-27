@@ -60,6 +60,43 @@ wasted effort.
 - Fixtures include real anonymized `.scout-logs` and `usage-tracker.jsonl` — prefer
   adding a fixture over inlining log strings.
 
+## Fixtures must be anonymized — this repo and both siblings are public
+
+The live vault is a real person's work data (see "Debugging against real data"), so
+anything lifted from it into a fixture (or an inline test string) **must be scrubbed
+before it lands**. All three Scout repos are public on GitHub.
+
+- **No real identifiers.** Strip company/product names, real coworker names, real Linear
+  IDs, GitHub repos, and Slack workspaces/channels. Use the established stand-ins so
+  fixtures stay internally consistent:
+  - People: `Alex` / `Priya` / `Sam`; comment/proposal author `alex` / `Alex`.
+  - Linear: `PROJ-1234` — never the real team prefixes (`AI-`, `KAI-`, `ST-`, …).
+  - GitHub: `example-org/example-repo`.
+  - Slack: `example.slack.com/archives/C0123456789/p1700000000000000`.
+  - Vendors/products: a generic noun ("the demo", "the tracing job"), not the brand.
+- **Anonymize content, not structure.** Keep the load-bearing tokens the parser is
+  actually tested on — the synthetic `[#TAG]` short-prefixes (`MIRO`, `AI3026`, `RSM`,
+  `5864M`…), `**bold**`, `_(italic)_`, `[[wikilinks]]`, ` — ` separators, `` `code` ``.
+  Only swap the words around them. Tags like `MIRO`/`AI3026` are chosen for their letters
+  (they exercise the non-Crockford `I`/`O` path), so don't rename them.
+
+### `parser-corpus.json` is ONE byte-identical file living in three repos
+
+It is the cross-language parser contract, checksum-guarded on two sides, so you cannot
+edit just one copy. On any change (anonymizing counts):
+
+1. Edit `ScoutMobileTests/Fixtures/parser-corpus.json`; keep every `expected` field
+   consistent with the parser rules (`ParserContractTests` is the judge).
+2. Copy it byte-for-byte into the siblings (clones sit next to this repo under `../`):
+   - `../Scout/ScoutTests/Fixtures/parser-corpus.json` (desktop app)
+   - `../scout-plugin/engine/tests/fixtures/contract/parser-corpus.json` (the canonical copy)
+3. Update BOTH checksum guards to the new `shasum -a 256` of the file:
+   - `canonicalSHA256` in `../Scout/ScoutTests/ActionItems/ParserContractTests.swift`
+   - `EXPECTED_SHA256` in `../scout-plugin/engine/tests/unit/test_parser_corpus_checksum.py`
+4. Verify all three sides: scout-ios `ParserContractTests`; desktop
+   `-only-testing:ScoutTests/ParserContractTests` on `platform=macOS`; plugin
+   `pytest tests/unit/test_parser_contract.py tests/unit/test_parser_corpus_checksum.py`.
+
 ## Editor diagnostics lie; the build is the source of truth
 
 SourceKit analyzes files in isolation without module context, so editing any file

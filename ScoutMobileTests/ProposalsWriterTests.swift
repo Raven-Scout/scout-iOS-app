@@ -7,7 +7,7 @@ private let writerFixture = """
 
 ### P-2026-06-13-01 — Add a risk-scoped PR re-resolution step
 
-**Status:** Proposed (awaiting Adam approval)
+**Status:** Proposed (awaiting Alex approval)
 
 **Problem.** SKILL.md anchored on one PR.
 
@@ -39,7 +39,7 @@ struct ProposalsWriterRewriteTests {
         // The other proposal's status is untouched.
         #expect(out.contains("**Status:** Pending (auto-apply after 2026-06-13)"))
         // The proposed status is gone (exactly one status changed).
-        #expect(!out.contains("**Status:** Proposed (awaiting Adam approval)"))
+        #expect(!out.contains("**Status:** Proposed (awaiting Alex approval)"))
     }
 
     @Test func leavesBodyAndCodeFenceByteIdentical() throws {

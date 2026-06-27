@@ -43,7 +43,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Linear")
                 } footer: {
-                    Text("Used to open Linear issues like AI-3026 in the Linear app.")
+                    Text("Used to open Linear issues like PROJ-3026 in the Linear app.")
                 }
 
                 Section {
