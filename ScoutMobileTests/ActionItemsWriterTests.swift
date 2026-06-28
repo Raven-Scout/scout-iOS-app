@@ -12,7 +12,7 @@ struct ActionItemsWriterTests {
     ## 🔴 Urgent
     - [ ] [#AB12] **First task** — details here
       - Source: somewhere
-      - Context: [[kai-agent]]
+      - Context: [[backend-service]]
     - [x] [#CD34] **Done task** — finished
     - [ ] Unprefixed legacy task — still matched by subject
 
