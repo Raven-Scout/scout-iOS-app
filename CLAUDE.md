@@ -90,7 +90,7 @@ before it lands**. All three Scout repos are public on GitHub.
   vault before using it** — the previous set (`MIRO`, `AI3026`, `RSM`, `5864M`)
   was documented here as synthetic but was not: each appeared in dozens to
   hundreds of real vault files, and `AI3026` was a real Linear id under the real
-  `AI-` prefix. Replaced in Raven-Scout/Scout#112.
+  `AI-` prefix. Replaced in Raven-Scout/Scout#111.
 
   To check a literal, count *files* and exclude `~/Scout/.claude/` — those are
   session transcripts holding copies of these repos' own source, so they inflate
