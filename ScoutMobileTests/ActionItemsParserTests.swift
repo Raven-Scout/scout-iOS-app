@@ -38,14 +38,14 @@ struct ActionItemsParserTests {
         #expect(r1 == "**Subject**")
 
         // Pure numeric is a GitHub ref, not a prefix.
-        let (p2, _) = ActionItemsParser.extractShortPrefix("[#5864] thing")
+        let (p2, _) = ActionItemsParser.extractShortPrefix("[#7391] thing")
         #expect(p2 == nil)
 
         // Widened grammar: 2–8 chars.
-        let (p3, _) = ActionItemsParser.extractShortPrefix("[#RSM] thing")
-        #expect(p3 == "RSM")
-        let (p4, _) = ActionItemsParser.extractShortPrefix("[#AI3026] thing")
-        #expect(p4 == "AI3026")
+        let (p3, _) = ActionItemsParser.extractShortPrefix("[#NTX] thing")
+        #expect(p3 == "NTX")
+        let (p4, _) = ActionItemsParser.extractShortPrefix("[#XI7391] thing")
+        #expect(p4 == "XI7391")
     }
 
     @Test func detectsDeepLinks() {
