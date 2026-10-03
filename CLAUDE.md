@@ -74,11 +74,32 @@ before it lands**. All three Scout repos are public on GitHub.
   - GitHub: `example-org/example-repo`.
   - Slack: `example.slack.com/archives/C0123456789/p1700000000000000`.
   - Vendors/products: a generic noun ("the demo", "the tracing job"), not the brand.
-- **Anonymize content, not structure.** Keep the load-bearing tokens the parser is
-  actually tested on — the synthetic `[#TAG]` short-prefixes (`MIRO`, `AI3026`, `RSM`,
-  `5864M`…), `**bold**`, `_(italic)_`, `[[wikilinks]]`, ` — ` separators, `` `code` ``.
-  Only swap the words around them. Tags like `MIRO`/`AI3026` are chosen for their letters
-  (they exercise the non-Crockford `I`/`O` path), so don't rename them.
+- **Anonymize content, not structure.** Keep the load-bearing *shapes* the parser is
+  actually tested on — `[#TAG]` short-prefixes, `**bold**`, `_(italic)_`,
+  `[[wikilinks]]`, ` — ` separators, `` `code` ``. Only swap the words around them.
+  A `[#TAG]`'s **shape** is load-bearing; its **letters are not**. Each corpus tag
+  exercises one grammar property, and a replacement must preserve that property —
+  the `_note` on each case says which:
+  - `IOTA` — 4 chars, contains I and O, i.e. *not* Crockford base32 (which omits
+    I/L/O/U). A replacement must also contain one of those letters.
+  - `XI7391` — 6 chars, contains I; longer than the old 4-char limit.
+  - `NTX` — 3 chars, no bold, no separator.
+  - `7391K` — digit-led with a trailing letter, so it is not a bare GitHub ref.
+
+  The tags are invented and must stay that way. **Verify a new tag against the
+  vault before using it** — the previous set (`MIRO`, `AI3026`, `RSM`, `5864M`)
+  was documented here as synthetic but was not: each appeared in dozens to
+  hundreds of real vault files, and `AI3026` was a real Linear id under the real
+  `AI-` prefix. Replaced in Raven-Scout/Scout#111.
+
+  To check a literal, count *files* and exclude `~/Scout/.claude/` — those are
+  session transcripts holding copies of these repos' own source, so they inflate
+  every literal, invented ones included:
+
+  ```bash
+  grep -rIow -F -f candidates.txt ~/Scout | sort -u \
+    | grep -v '/Scout/\.claude/' | awk -F: '{print $NF}' | sort | uniq -c | sort -rn
+  ```
 
 ### `parser-corpus.json` is ONE byte-identical file living in three repos
 
