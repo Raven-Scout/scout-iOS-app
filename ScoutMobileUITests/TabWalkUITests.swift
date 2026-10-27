@@ -19,7 +19,7 @@ final class TabWalkUITests: XCTestCase {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 10), "tab bar should appear (vault override active)")
 
-        for tab in ["Today", "Activity", "Proposals", "Knowledge", "Settings"] {
+        for tab in ["Today", "Activity", "Ideas", "Knowledge", "Settings"] {
             let button = tabBar.buttons[tab]
             XCTAssertTrue(button.waitForExistence(timeout: 5), "\(tab) tab should exist")
             button.tap()
