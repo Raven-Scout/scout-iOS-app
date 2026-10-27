@@ -182,7 +182,20 @@ operational gist:
   the app still runs on Duo, but in a compatibility layout (left of the status bar
   and camera, horizontal bars). Only a 27.1 build gets the full screen, the side
   (vertical) bars and fold handling. Test in Xcode 27.1's iPhone Duo simulator via
-  Device Hub (open / close / rotate / fold controls under the device).
+  Device Hub (open / close / rotate / fold controls under the device). Xcode 27.1
+  lives next to 26.5; export it the same way, never via `xcode-select`:
+
+  ```bash
+  export DEVELOPER_DIR=/Applications/Xcode-27.1.0.app/Contents/Developer
+  xcodebuild test -project ScoutMobile.xcodeproj -scheme ScoutMobile \
+    -destination 'platform=iOS Simulator,name=iPhone Duo,OS=27.1' \
+    -only-testing:ScoutMobileTests CODE_SIGNING_ALLOWED=NO
+  ```
+
+  The iOS 27.1 runtime only runs iPhone Duo; regular iPhones need `OS=27.0` with the
+  same Xcode. On the Duo, XCUITest taps work on either display but its screenshots
+  come out black — capture with `xcrun simctl io <udid> screenshot --display=<id>`
+  (IDs from `simctl io <udid> enumerate`; they change on reboot).
 - **Guard iOS 27.x-only APIs twice:** `#if compiler(>=6.4)` (Swift 6.4 = Xcode 27,
   so Xcode 26.5 / Swift 6.3 still compiles) *and* `if #available(iOS 27.1, *)`.
   Xcode 27.0 also ships Swift 6.4 but only the iOS 27.0 SDK, so it fails on 27.1

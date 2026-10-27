@@ -73,9 +73,9 @@ items that should "stay put in the nav bar", and a split view's sidebar column k
 
 ## Verification checklist
 
-So far the changes have only been syntax-checked (`swiftc -parse`, Swift 6.4.1), not built against the iOS SDK
-or run. On Xcode 27.1 with the iPhone Duo simulator (Device Hub's open / close / rotate / fold controls), plus a
-regular iPhone simulator for regressions:
+Walked on 2026-10-27 in the simulator; results per item are under *Verification results* below. On Xcode 27.1
+with the iPhone Duo simulator (Device Hub's open / close / rotate / fold controls), plus a regular iPhone simulator
+for regressions:
 
 1. `xcodegen generate`, build, and run `ScoutMobileTests`; also build once with Xcode 26.5 to confirm the
    compiler guard.
@@ -97,3 +97,39 @@ regular iPhone simulator for regressions:
    the outer edge and no content hides under it.
 7. **Regression on a non-Duo iPhone:** every tab behaves as before; on a Pro Max in landscape (regular width)
    Activity and Knowledge now show two columns, as Mail and Notes do.
+
+## Verification results
+
+Xcode 27.1 (27A9275) with the iPhone Duo simulator on iOS 27.1 (24A94425). The iOS 27.1 runtime only runs iPhone Duo, so
+the regular iPhones ran on iOS 27.0 (24A434) with the same Xcode. UI checks were driven by a throwaway XCUITest
+against a copy of a real vault, with screenshots taken per display through `simctl io <device> screenshot --display=<id>`.
+No code changes were needed, so the design above is unchanged.
+
+| # | Item | Result |
+| --- | --- | --- |
+| 1 | Build and unit tests | Xcode 27.1 builds clean, no warnings in the changed files. `ScoutMobileTests` 88/88 on iPhone Duo (27.1) and iPhone 17 Pro (27.0). Xcode 26.5 builds and passes 88/88 on iPhone 17 Pro (26.5), so the `#if compiler(>=6.4)` guard holds. |
+| 2 | Outer display | Portrait: tab bar, Today's ‹ › and Filter, and Ideas' ＋ sit in the vertical side bar; the segmented pickers stay in the top bar; Back is at the top of the side bar. `.labelStyle(.iconOnly)` didn't keep the `Label`s horizontal, so it stays. Landscape: ‹ › and Filter overflow into the side bar's ••• menu. |
+| 3 | Activity | Inner display (and a Pro Max in landscape): runs and the selected run side by side, the row stays selected across the 60 s reload (waited 65 s), Schedule keeps the detail. Outer display and iPhone 17 Pro: tap a run → detail pushes → Back returns to the list. Frame-stepping six Sessions ↔ Schedule switches on iPhone 17 Pro showed no segmented-control collapse. |
+| 4 | Knowledge | Inner display: root beside the detail, a folder and a note open in the detail column, `[[channels]]` pushes onto the detail stack, picking another root entry resets it to that entry. Outer display and iPhone 17 Pro: folder → note → Back twice to the root. |
+| 5 | Fold | Book pose: onboarding puts the intro on the leading half and *Choose Scout Folder* on the trailing half; the Filter menu opens on the trailing half and the Add sheet on the leading half; split views put list and detail on either side of the fold. Laptop pose: intro on the top half, button on the bottom half. Flat: single column again. |
+| 6 | Split View multitasking | Not verified (no scripted way to arrange two apps side by side). |
+| 7 | Non-Duo regression | iPhone 17 Pro (27.0 and 26.5): every tab as before, onboarding unchanged. iPhone 17 Pro Max in landscape (regular width): Activity and Knowledge show two columns. |
+
+Findings:
+
+- **Inner display in portrait** (horizontal bars, as Apple specifies) opens Activity and Knowledge on the empty detail
+  placeholder with the sidebar collapsed behind its toggle, like an iPad split view in portrait. It works, but the
+  first thing you see is "No session selected" / "Nothing open". Showing both columns there would need explicit
+  `columnVisibility` handling; left as is for now.
+- On the inner display the first tab tap right after dismissing the Filter menu didn't switch tabs in XCUITest (a second
+  tap did). Synthetic taps can't tell whether a real finger hits the same thing; check on a device.
+- The Duo simulator has no `simctl` command for poses. Besides Device Hub, poses can be scripted from inside the
+  simulator through SpringBoard's private display tool service (`SBSDisplayToolService`
+  `swapDisplayWithSettings:completion:`, the service Apple's internal `suiatool` uses). That needs a simulator binary
+  carrying the `com.apple.springboard.sbdisplay.service` entitlement in its `__TEXT,__entitlements` section; it is how
+  the poses above were set. It is private SPI, for local testing only.
+- XCUITest drives both displays, but its own screenshots come out black on the Duo; capture with `simctl io` instead.
+  Display IDs change when the simulator reboots, so look them up with `simctl io <device> enumerate`.
+
+Still unverified: a real device (including first-tap behavior), Split View multitasking, standing poses, and the
+Xcode 26.5 build *running* on Duo in the compatibility layout.
