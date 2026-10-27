@@ -115,6 +115,20 @@ No code changes were needed, so the design above is unchanged.
 | 6 | Split View multitasking | Not verified (no scripted way to arrange two apps side by side). |
 | 7 | Non-Duo regression | iPhone 17 Pro (27.0 and 26.5): every tab as before, onboarding unchanged. iPhone 17 Pro Max in landscape (regular width): Activity and Knowledge show two columns. |
 
+Screenshots (iPhone Duo simulator, iOS 27.1):
+
+- Onboarding in book pose (left) and laptop pose (right):
+  ![Onboarding in book and laptop pose](images/iphone-duo/onboarding-book-laptop.png)
+- Book pose: Ideas, the Add sheet, and the Activity and Knowledge split views:
+  ![Book pose](images/iphone-duo/book-pose.png)
+  The Add sheet sits on the leading half on purpose: in book pose the system moves sheets off the fold rather
+  than centering them across the crease (HIG: sheets, alerts and menus avoid the fold on their own). With the
+  device open flat the same sheet is centered.
+- Outer display, portrait: Filter menu, Ideas' ＋ and the tabs in the side bar, Activity, Knowledge:
+  ![Outer display, portrait](images/iphone-duo/outer-portrait.png)
+- Outer display, landscape: ‹ › and Filter overflow into the ••• menu:
+  ![Outer display, landscape](images/iphone-duo/outer-landscape.png)
+
 Findings:
 
 - **Inner display in portrait** (horizontal bars, as Apple specifies) opens Activity and Knowledge on the empty detail
