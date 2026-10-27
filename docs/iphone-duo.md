@@ -131,10 +131,13 @@ Screenshots (iPhone Duo simulator, iOS 27.1):
 
 Findings:
 
-- **Inner display in portrait** (horizontal bars, as Apple specifies) opens Activity and Knowledge on the empty detail
-  placeholder with the sidebar collapsed behind its toggle, like an iPad split view in portrait. It works, but the
-  first thing you see is "No session selected" / "Nothing open". Showing both columns there would need explicit
-  `columnVisibility` handling; left as is for now.
+- **Inner display in portrait** (horizontal bars, as Apple specifies) opened Activity and Knowledge on the empty detail
+  placeholder with the sidebar collapsed behind its toggle. *Fixed:* the split view is too narrow there to tile
+  (the sidebar can only overlay the detail, whatever the column widths), so `listDetailColumns(_:selection:)`
+  shows the list as an overlay until something is picked, then the detail full width; where the container is wider
+  than tall both columns stay visible. Size classes can't tell the two apart (both regular × regular), hence the
+  container's shape. Knowledge also needed the setting re-applied after appearing: its detail `NavigationStack`
+  makes the split view drop to `.detailOnly` on first appearance.
 - On the inner display the first tab tap right after dismissing the Filter menu didn't switch tabs in XCUITest (a second
   tap did). Synthetic taps can't tell whether a real finger hits the same thing; check on a device.
 - The Duo simulator has no `simctl` command for poses. Besides Device Hub, poses can be scripted from inside the

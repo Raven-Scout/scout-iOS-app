@@ -12,10 +12,12 @@ import SwiftUI
 /// other iPhone in portrait) the split view collapses into the same push
 /// navigation the tab always had. Selection is by `Run.ID`, not `Run`, so the
 /// highlight and the detail survive the 60 s reload rewriting a running run.
+/// Column visibility follows `listDetailColumns(_:selection:)`.
 struct ActivityScreen: View {
     @EnvironmentObject private var model: AppModel
     @State private var pane: Pane = .sessions
     @State private var selectedRunID: Run.ID?
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var compactColumn = NavigationSplitViewColumn.sidebar
 
     enum Pane: String, CaseIterable {
@@ -24,7 +26,7 @@ struct ActivityScreen: View {
     }
 
     var body: some View {
-        NavigationSplitView(preferredCompactColumn: $compactColumn) {
+        NavigationSplitView(columnVisibility: $columnVisibility, preferredCompactColumn: $compactColumn) {
             Group {
                 switch pane {
                 case .sessions:
@@ -50,6 +52,7 @@ struct ActivityScreen: View {
             RunDetailColumn(store: model.sessions, runID: selectedRunID)
         }
         .navigationSplitViewStyle(.balanced)
+        .listDetailColumns($columnVisibility, selection: selectedRunID)
     }
 }
 

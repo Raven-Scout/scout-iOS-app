@@ -213,6 +213,9 @@ operational gist:
   to push navigation. Keep a sidebar's selection value type distinct from the
   detail stack's `navigationDestination` types (see the `KnowledgeScreen` doc
   comment), and select by stable ID so periodic reloads don't drop the selection.
+  Drive column visibility with `listDetailColumns(_:selection:)`
+  (`Views/Components/ListDetailColumns.swift`); left `.automatic`, the inner
+  display in portrait opens on the empty detail placeholder.
 - **Toolbar items need a title and an SF Symbol** (`Label`) to move into the
   vertical bar; text-only items and custom views (the segmented pickers) stay in a
   horizontal bar by design. Never base layout on `UIScreen.main`,

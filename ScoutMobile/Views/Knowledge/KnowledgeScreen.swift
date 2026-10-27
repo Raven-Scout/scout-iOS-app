@@ -5,7 +5,7 @@ import SwiftUI
 /// onto the detail column's own stack. On the iPhone Duo inner display
 /// (regular width) the root stays in view next to what you're reading; in
 /// compact width the split view collapses into the same push navigation the
-/// tab always had.
+/// tab always had. Column visibility follows `listDetailColumns(_:selection:)`.
 ///
 /// The sidebar selects by `Entry.ID` (the relative path) while the detail stack
 /// pushes `Entry` values. Keeping the two types distinct is deliberate: per the
@@ -17,10 +17,11 @@ struct KnowledgeScreen: View {
     @EnvironmentObject private var model: AppModel
     @State private var selectedPath: KnowledgeBaseStore.Entry.ID?
     @State private var detailPath: [KnowledgeBaseStore.Entry] = []
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var compactColumn = NavigationSplitViewColumn.sidebar
 
     var body: some View {
-        NavigationSplitView(preferredCompactColumn: $compactColumn) {
+        NavigationSplitView(columnVisibility: $columnVisibility, preferredCompactColumn: $compactColumn) {
             KnowledgeFolderView(store: model.knowledge, relativePath: "", title: "Knowledge", selection: $selectedPath)
         } detail: {
             NavigationStack(path: $detailPath) {
@@ -43,6 +44,7 @@ struct KnowledgeScreen: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .listDetailColumns($columnVisibility, selection: selectedPath)
         // A new root in the detail column starts from an empty stack.
         .onChange(of: selectedPath) { _, _ in detailPath = [] }
     }
