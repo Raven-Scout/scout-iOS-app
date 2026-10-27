@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Schedule list content — upcoming fires plus the configured slots. Hosted
-/// inside `ActivityScreen`'s shared `NavigationStack`, so it carries no
-/// navigation chrome of its own.
+/// in the sidebar column of `ActivityScreen`'s `NavigationSplitView`, so it
+/// carries no navigation chrome of its own.
 struct ScheduleList: View {
     @ObservedObject var store: ScheduleStore
     @State private var typeFilter: SlotType?

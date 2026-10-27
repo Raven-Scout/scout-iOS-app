@@ -141,8 +141,9 @@ shows spurious errors like *"Cannot find type 'Run' in scope"* / *"No such modul
 ## SwiftUI nav-bar gotchas (segmented picker + toolbar buttons)
 
 Both of these bit us hard on the Ideas tab (`Views/Ideas/IdeasScreen.swift`).
-`ActivityScreen` is the reference for "doing it right" — copy its shape for any
-new tab with a nav-bar segmented control.
+`IdeasScreen` is the reference for "doing it right" — copy its shape for any
+new `NavigationStack` tab with a nav-bar segmented control. (`ActivityScreen` used
+to be the reference; it is now a `NavigationSplitView` for iPhone Duo, see below.)
 
 - **A segmented `Picker` in `ToolbarItem(placement: .principal)` collapses its
   segments onto one spot for a frame on every selection change UNLESS the
@@ -150,8 +151,11 @@ new tab with a nav-bar segmented control.
   stack destructively re-lays-out the principal item when the content swaps,
   re-running the bridged `UISegmentedControl` layout. It's only *visible* with ≥3
   segments — two short ones (Sessions/Schedule) reflow imperceptibly, which is the
-  only reason `ActivityScreen` looked fine. `ActivityScreen` is stable because it
-  registers a real `Run` destination; `IdeasScreen` has no detail navigation so it
+  only reason `ActivityScreen` originally looked fine. As a `NavigationStack` it was
+  stable because it registered a real `Run` destination; it is now a
+  `NavigationSplitView` whose sidebar registers none, which is only acceptable
+  because it has two segments — frame-step it (below) before adding a third.
+  `IdeasScreen` has no detail navigation so it
   registers a **no-op** `navigationDestination(for: IdeasNoNavigation.self)`. Add a
   destination to any new segmented-picker-in-the-nav-bar screen. The defect is in
   UIKit's nav-bar title compatibility path (`_UITAMICAdaptorView`; Apple DTS
@@ -168,6 +172,39 @@ new tab with a nav-bar segmented control.
   Keep toolbar buttons and their `.sheet` at the stable `NavigationStack` level,
   not in the swapped child, and present with `.sheet(item:)`. This is why
   `IdeasScreen` owns the ＋ Add button/sheet rather than `PerFileListView`.
+
+## iPhone Duo (foldable, two displays)
+
+Full audit, rationale and the on-device checklist: `docs/iphone-duo.md`. The
+operational gist:
+
+- **The Duo layout needs the iOS 27.1 SDK (Xcode 27.1+).** Built with Xcode 26.x
+  the app still runs on Duo, but in a compatibility layout (left of the status bar
+  and camera, horizontal bars). Only a 27.1 build gets the full screen, the side
+  (vertical) bars and fold handling. Test in Xcode 27.1's iPhone Duo simulator via
+  Device Hub (open / close / rotate / fold controls under the device).
+- **Guard iOS 27.x-only APIs twice:** `#if compiler(>=6.4)` (Swift 6.4 = Xcode 27,
+  so Xcode 26.5 / Swift 6.3 still compiles) *and* `if #available(iOS 27.1, *)`.
+  Xcode 27.0 also ships Swift 6.4 but only the iOS 27.0 SDK, so it fails on 27.1
+  symbols (`ReservedRegion`, `ArrangementView`, `toolbarVerticalEdge`, …) — build
+  with 26.x or 27.1+, never 27.0.
+- **No `if #available` inside `.toolbar { }`.** It needs
+  `ToolbarContentBuilder.buildLimitedAvailability`, which is iOS 17.5+ while the
+  target is 17.0 — that's why `visibilityPriority` / `axisBehavior` aren't adopted.
+- **Let system containers handle the fold.** Lists, sheets, alerts, menus, split
+  views, tab bars and toolbars already move off the fold and onto the side bar;
+  scrolling content doesn't need to avoid the fold at all. Read `ReservedRegion`s
+  only for custom, non-scrolling layouts with controls (today: `OnboardingView`).
+- **List → detail tabs are `NavigationSplitView`s** (Activity, Knowledge), so the
+  inner display (regular width) shows both levels and compact width collapses back
+  to push navigation. Keep a sidebar's selection value type distinct from the
+  detail stack's `navigationDestination` types (see the `KnowledgeScreen` doc
+  comment), and select by stable ID so periodic reloads don't drop the selection.
+- **Toolbar items need a title and an SF Symbol** (`Label`) to move into the
+  vertical bar; text-only items and custom views (the segmented pickers) stay in a
+  horizontal bar by design. Never base layout on `UIScreen.main`,
+  `userInterfaceIdiom` or interface orientation — the inner display ignores
+  `UISupportedInterfaceOrientations`; use size classes.
 
 ## Verifying one-frame UI glitches
 

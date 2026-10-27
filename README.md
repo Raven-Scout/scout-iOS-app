@@ -10,10 +10,11 @@ Scout runs as scheduled Claude Code sessions on your Mac and writes everything i
 - **Knowledge** — browse the vault's markdown (knowledge base, people, projects) with tappable `[[wikilinks]]`.
 - **Notifications** — background refresh checks for newly finished runs and fires a local notification (optionally failures only).
 - **Deep links** — Linear issue refs, GitHub PR URLs, and Slack thread URLs in action items open in their native apps.
+- **iPhone Duo** — adapts to both displays: list and detail side by side on the inner display (Activity, Knowledge), toolbars and tab bar in the side bar, and a first-run screen that keeps its button out of the fold. See [docs/iphone-duo.md](docs/iphone-duo.md).
 
 ## Requirements
 
-- iOS 17+, Xcode 16+ (built against Xcode 26).
+- iOS 17+, Xcode 16+ (built against Xcode 26). For the full iPhone Duo layout (side bars, fold handling) build with Xcode 27.1+ — Xcode 26 builds run on Duo in a compatibility layout, and Xcode 27.0 isn't supported.
 - A Scout vault reachable from the iPhone — in practice: the vault folder inside `iCloud Drive/Obsidian/`.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) to generate the project (`brew install xcodegen`).
 
