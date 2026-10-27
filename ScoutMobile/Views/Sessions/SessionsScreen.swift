@@ -1,14 +1,16 @@
 import SwiftUI
 
-/// Sessions list content — the run history plus an "Up next" row. Hosted
-/// inside `ActivityScreen`'s shared `NavigationStack`, so it carries no
-/// navigation chrome of its own (the `Run` destination lives on the parent).
+/// Sessions list content — the run history plus an "Up next" row. Hosted in
+/// the sidebar column of `ActivityScreen`'s `NavigationSplitView`, so it
+/// carries no navigation chrome of its own: tapping a run sets `selection`,
+/// which the split view shows in its detail column (or pushes, when collapsed).
 struct SessionsList: View {
     @ObservedObject var store: SessionsStore
     @ObservedObject var schedule: ScheduleStore
+    @Binding var selection: Run.ID?
 
     var body: some View {
-        List {
+        List(selection: $selection) {
             if let next = schedule.upcoming.first {
                 Section("Up next") {
                     HStack(spacing: 10) {
@@ -39,7 +41,7 @@ struct SessionsList: View {
                 ForEach(groupedRuns, id: \.day) { group in
                     Section(group.day.dayLabel) {
                         ForEach(group.runs) { run in
-                            NavigationLink(value: run) {
+                            NavigationLink(value: run.id) {
                                 RunRowView(run: run)
                             }
                         }

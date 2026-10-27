@@ -1,25 +1,67 @@
 import SwiftUI
 
+/// Two-column `NavigationSplitView`: the vault root in the sidebar, the picked
+/// folder or note in the detail column, and deeper folders and notes pushed
+/// onto the detail column's own stack. On the iPhone Duo inner display
+/// (regular width) the root stays in view next to what you're reading; in
+/// compact width the split view collapses into the same push navigation the
+/// tab always had.
+///
+/// The sidebar selects by `Entry.ID` (the relative path) while the detail stack
+/// pushes `Entry` values. Keeping the two types distinct is deliberate: per the
+/// `NavigationSplitView` docs, a link in an earlier column whose value type has
+/// a `navigationDestination` in a later column's stack sets that stack's
+/// content, so a shared type would let one sidebar tap both select and push.
+/// (This is also why the old, unused `String` destination is gone.)
 struct KnowledgeScreen: View {
     @EnvironmentObject private var model: AppModel
+    @State private var selectedPath: KnowledgeBaseStore.Entry.ID?
+    @State private var detailPath: [KnowledgeBaseStore.Entry] = []
+    @State private var compactColumn = NavigationSplitViewColumn.sidebar
 
     var body: some View {
-        NavigationStack {
-            KnowledgeFolderView(store: model.knowledge, relativePath: "", title: "Knowledge")
-                .navigationDestination(for: KnowledgeBaseStore.Entry.self) { entry in
-                    if entry.isDirectory {
-                        KnowledgeFolderView(store: model.knowledge, relativePath: entry.relativePath, title: entry.name)
+        NavigationSplitView(preferredCompactColumn: $compactColumn) {
+            KnowledgeFolderView(store: model.knowledge, relativePath: "", title: "Knowledge", selection: $selectedPath)
+        } detail: {
+            NavigationStack(path: $detailPath) {
+                Group {
+                    if let entry = selectedEntry {
+                        KnowledgeEntryView(store: model.knowledge, entry: entry)
                     } else {
-                        MarkdownFileView(store: model.knowledge, relativePath: entry.relativePath, title: entry.name)
+                        ContentUnavailableView(
+                            "Nothing open",
+                            systemImage: "books.vertical",
+                            description: Text("Pick a folder or note to read it here.")
+                        )
                     }
                 }
-                .navigationDestination(for: String.self) { wikiPath in
-                    MarkdownFileView(
-                        store: model.knowledge,
-                        relativePath: wikiPath,
-                        title: URL(fileURLWithPath: wikiPath).deletingPathExtension().lastPathComponent
-                    )
+                // Fresh state (loaded text, pending wikilink push) per sidebar pick.
+                .id(selectedPath)
+                .navigationDestination(for: KnowledgeBaseStore.Entry.self) { entry in
+                    KnowledgeEntryView(store: model.knowledge, entry: entry)
                 }
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
+        // A new root in the detail column starts from an empty stack.
+        .onChange(of: selectedPath) { _, _ in detailPath = [] }
+    }
+
+    private var selectedEntry: KnowledgeBaseStore.Entry? {
+        model.knowledge.entriesByPath[""]?.first { $0.id == selectedPath }
+    }
+}
+
+/// A folder listing or a rendered note, whichever `entry` is.
+private struct KnowledgeEntryView: View {
+    let store: KnowledgeBaseStore
+    let entry: KnowledgeBaseStore.Entry
+
+    var body: some View {
+        if entry.isDirectory {
+            KnowledgeFolderView(store: store, relativePath: entry.relativePath, title: entry.name)
+        } else {
+            MarkdownFileView(store: store, relativePath: entry.relativePath, title: entry.name)
         }
     }
 }
@@ -28,37 +70,52 @@ struct KnowledgeFolderView: View {
     @ObservedObject var store: KnowledgeBaseStore
     let relativePath: String
     let title: String
+    /// Set only for `KnowledgeScreen`'s sidebar: rows then select their path
+    /// for the detail column instead of pushing an `Entry`.
+    var selection: Binding<KnowledgeBaseStore.Entry.ID?>?
 
     var body: some View {
-        List {
-            let entries = store.entriesByPath[relativePath] ?? []
-            if entries.isEmpty {
-                ContentUnavailableView(
-                    "Nothing here",
-                    systemImage: "folder",
-                    description: Text(store.lastError ?? "No markdown files in this folder.")
-                )
+        list
+            .listStyle(.insetGrouped)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .task(id: relativePath) {
+                await store.loadEntries(at: relativePath)
             }
-            ForEach(entries) { entry in
-                NavigationLink(value: entry) {
-                    HStack(spacing: 10) {
-                        Image(systemName: entry.isDirectory ? "folder" : "doc.text")
-                            .foregroundStyle(entry.isDirectory ? Color.accentColor : .secondary)
-                            .frame(width: 24)
-                        Text(entry.isDirectory ? entry.name : String(entry.name.dropLast(3)))
-                            .font(.subheadline)
-                    }
+            .refreshable {
+                await store.loadEntries(at: relativePath)
+            }
+    }
+
+    @ViewBuilder
+    private var list: some View {
+        if let selection {
+            List(selection: selection) { rows(linking: \.id) }
+        } else {
+            List { rows(linking: { $0 }) }
+        }
+    }
+
+    @ViewBuilder
+    private func rows<Value: Hashable>(linking value: @escaping (KnowledgeBaseStore.Entry) -> Value) -> some View {
+        let entries = store.entriesByPath[relativePath] ?? []
+        if entries.isEmpty {
+            ContentUnavailableView(
+                "Nothing here",
+                systemImage: "folder",
+                description: Text(store.lastError ?? "No markdown files in this folder.")
+            )
+        }
+        ForEach(entries) { entry in
+            NavigationLink(value: value(entry)) {
+                HStack(spacing: 10) {
+                    Image(systemName: entry.isDirectory ? "folder" : "doc.text")
+                        .foregroundStyle(entry.isDirectory ? Color.accentColor : .secondary)
+                        .frame(width: 24)
+                    Text(entry.isDirectory ? entry.name : String(entry.name.dropLast(3)))
+                        .font(.subheadline)
                 }
             }
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
-        .task(id: relativePath) {
-            await store.loadEntries(at: relativePath)
-        }
-        .refreshable {
-            await store.loadEntries(at: relativePath)
         }
     }
 }
