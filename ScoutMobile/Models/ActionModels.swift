@@ -79,6 +79,8 @@ struct ActionTask: Identifiable, Equatable, Hashable, Sendable {
     let shortPrefix: String?
     /// Source section kind recorded in the snoozed-until marker.
     let snoozedFromKind: ActionSection.Kind?
+    /// `/scout-plan` estimate, calendar block and actual time (see `TaskPlan`).
+    let plan: TaskPlan
 
     init(
         id: UUID,
@@ -93,7 +95,8 @@ struct ActionTask: Identifiable, Equatable, Hashable, Sendable {
         carriedInFrom: Date?,
         indentLevel: Int = 0,
         shortPrefix: String? = nil,
-        snoozedFromKind: ActionSection.Kind? = nil
+        snoozedFromKind: ActionSection.Kind? = nil,
+        plan: TaskPlan = .none
     ) {
         self.id = id
         self.lineNumber = lineNumber
@@ -108,16 +111,18 @@ struct ActionTask: Identifiable, Equatable, Hashable, Sendable {
         self.indentLevel = indentLevel
         self.shortPrefix = shortPrefix
         self.snoozedFromKind = snoozedFromKind
+        self.plan = plan
     }
 
-    func with(comments newComments: [TaskComment]? = nil, snoozedUntil newSnooze: Date?? = nil, snoozedFromKind newKind: ActionSection.Kind?? = nil) -> ActionTask {
+    func with(comments newComments: [TaskComment]? = nil, snoozedUntil newSnooze: Date?? = nil, snoozedFromKind newKind: ActionSection.Kind?? = nil, plan newPlan: TaskPlan? = nil) -> ActionTask {
         ActionTask(
             id: id, lineNumber: lineNumber, done: done,
             subject: subject, plainSubject: plainSubject, body: body,
             comments: newComments ?? comments, deepLinks: deepLinks,
             snoozedUntil: newSnooze ?? snoozedUntil, carriedInFrom: carriedInFrom,
             indentLevel: indentLevel, shortPrefix: shortPrefix,
-            snoozedFromKind: newKind ?? snoozedFromKind
+            snoozedFromKind: newKind ?? snoozedFromKind,
+            plan: newPlan ?? plan
         )
     }
 }

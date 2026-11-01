@@ -175,15 +175,27 @@ enum ActionItemsParser {
         let carryInFromKindRe = try NSRegularExpression(
             pattern: #"_\(carried in from \d{4}-\d{2}-\d{2}(?:[^)]*?,\s*was\s+([A-Za-z]+))?\)_"#
         )
+        /// `/scout-plan` markers (`  - estimate: 45m`, `  - block: …`, `  - actual: …`).
+        /// Folded into `task.plan` when `TaskPlan.merging` accepts the value;
+        /// otherwise the line stays a comment from "estimate" / "block" / "actual".
+        let planSubBulletRe = try NSRegularExpression(pattern: #"^\s+-\s+(estimate|block|actual):\s*(.*?)\s*$"#)
         let inlineCommentRe = try NSRegularExpression(pattern: #"^(\s+)(?:[-*+]\s+)?//==<<\s*(.+?)\s*>>==//\s*$"#)
         let bulletRe = try NSRegularExpression(pattern: #"^\s*-\s+(.+?)\s*$"#)
         let sectionRe = try NSRegularExpression(pattern: #"^## (\S+?)\s+(.+?)\s*$"#)
         let snoozeSuffixRe = try NSRegularExpression(pattern: #"\s*(?:—|–|-)\s*🛌 Snoozed until (\d{4}-\d{2}-\d{2})$"#)
         let carryInRe = try NSRegularExpression(pattern: #"_\(carried in from (\d{4}-\d{2}-\d{2})\)_"#)
 
+        // Whether a plan marker here still belongs to the last task. Like the
+        // engine's `plan_marks._mark_lines`, its sub-list ends at a blank or
+        // unindented line, and the next task line starts a new one.
+        var planMarkWindowOpen = false
+
         while i < lines.count {
             let line = lines[i]
             let stripped = line.trimmingCharacters(in: .whitespaces)
+            if stripped.isEmpty || !(line.first == " " || line.first == "\t") {
+                planMarkWindowOpen = false
+            }
 
             if stripped == "---" || stripped == "***" {
                 flushTable()
@@ -285,6 +297,7 @@ enum ActionItemsParser {
                     shortPrefix: shortPrefix,
                     snoozedFromKind: carryInKind
                 ))
+                planMarkWindowOpen = true
                 i += 1; continue
             }
 
@@ -319,6 +332,22 @@ enum ActionItemsParser {
                     snoozedFromKind: .some(parsedKind ?? last.snoozedFromKind)
                 )
                 i += 1; continue
+            }
+
+            // `/scout-plan` marker. Must precede subBulletCommentRe, which would
+            // otherwise read it as a comment from "estimate".
+            if inSection,
+               planMarkWindowOpen,
+               let last = currentTasks.last,
+               let pm = planSubBulletRe.firstMatch(in: line, range: NSRange(location: 0, length: (line as NSString).length)) {
+                let nsLine = line as NSString
+                if let plan = last.plan.merging(
+                    key: nsLine.substring(with: pm.range(at: 1)),
+                    value: nsLine.substring(with: pm.range(at: 2))
+                ) {
+                    currentTasks[currentTasks.count - 1] = last.with(plan: plan)
+                    i += 1; continue
+                }
             }
 
             // Sub-bullet comment: `  - <author>: <text>` (scoutctl ≥ v0.4).
