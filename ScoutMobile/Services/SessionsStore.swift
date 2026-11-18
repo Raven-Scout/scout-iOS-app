@@ -59,9 +59,11 @@ final class SessionsStore: ObservableObject {
         let usage = loadUsage(vault: vault)
         do {
             let names = try vault.listDirectory(relativePath: logsDir)
-            var out: [Run] = []
+            var out: [(run: Run, pid: Int?)] = []
             for name in names where name.hasSuffix(".log") {
                 let fileURL = URL(fileURLWithPath: "\(logsDir)/\(name)")
+                // Names that don't parse (failures.log, …) aren't runs. Both the
+                // minute name and the seconds+PID fallback parse.
                 guard let parsed = SessionLogParser.parseFilename(fileURL) else { continue }
                 guard let data = vault.readFileIfExists(relativePath: "\(logsDir)/\(name)"),
                       let text = String(data: data, encoding: .utf8) else { continue }
@@ -72,9 +74,11 @@ final class SessionsStore: ObservableObject {
                     type: parsed.type,
                     now: now
                 )
-                let cost = matchCost(usage: usage, type: parsed.type, near: parsed.startedAt, endedAt: body.endedAt)
-                out.append(Run(
-                    id: Run.makeId(type: parsed.type, startedAt: parsed.startedAt),
+                // A skipped run spent nothing; a nearby cost row is another run's.
+                let cost = body.status.isSkip ? nil
+                    : matchCost(usage: usage, type: parsed.type, near: parsed.startedAt, endedAt: body.endedAt)
+                out.append((run: Run(
+                    id: Run.makeId(type: parsed.type, startedAt: parsed.startedAt, pid: parsed.pid),
                     type: parsed.type,
                     runnerScript: parsed.runnerScript,
                     startedAt: parsed.startedAt,
@@ -87,10 +91,10 @@ final class SessionsStore: ObservableObject {
                     logPath: URL(fileURLWithPath: "\(logsDir)/\(name)"),
                     logSizeBytes: body.logSizeBytes,
                     errorsDetected: body.errorsDetected
-                ))
+                ), pid: parsed.pid))
             }
-            out.sort { $0.startedAt > $1.startedAt }
-            return (SessionLogParser.resolveStaleRunning(out), usage, nil)
+            let sorted = SessionLogParser.newestFirst(out)
+            return (SessionLogParser.resolveStaleRunning(sorted), usage, nil)
         } catch VaultAccess.VaultError.fileNotFound {
             return ([], usage, nil)
         } catch {

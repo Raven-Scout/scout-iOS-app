@@ -120,6 +120,172 @@ struct SessionLogParserTests {
     }
 }
 
+/// Unique run log names (Raven-Scout/Scout#673): a run claims the minute name
+/// `<runner>-YYYY-MM-DD_HH-MM.log` and falls back to
+/// `<runner>-YYYY-MM-DD_HH-MM-SS-PID.log` only when another run already took
+/// that minute. Mirrors the desktop app's SessionLogServiceTests.
+struct UniqueRunLogNameTests {
+
+    static let ny = TimeZone(identifier: "America/New_York")!
+
+    static func parse(_ name: String) -> SessionLogParser.ParsedFilename? {
+        SessionLogParser.parseFilename(URL(fileURLWithPath: ".scout-logs/\(name).log"), timeZone: ny)
+    }
+
+    static func makeRun(_ type: RunType, startedAt: Date, status: RunStatus, pid: Int? = nil, log: String = "/tmp/x.log") -> Run {
+        Run(
+            id: Run.makeId(type: type, startedAt: startedAt, pid: pid),
+            type: type, runnerScript: "run-scout.sh",
+            startedAt: startedAt, endedAt: nil, status: status,
+            exitCode: nil, durationSeconds: nil, cost: nil, budgetCap: nil,
+            logPath: URL(fileURLWithPath: log), logSizeBytes: 0,
+            errorsDetected: []
+        )
+    }
+
+    // MARK: - Both name forms and the id rule
+
+    @Test func minuteNameKeepsItsIdentity() throws {
+        let parsed = try #require(Self.parse("scout-2026-04-20_08-03"))
+        #expect(parsed.pid == nil)
+        #expect(parsed.type == .morningBriefing)
+        #expect(Calendar(identifier: .gregorian).dateComponents(in: Self.ny, from: parsed.startedAt).second == 0)
+        // The id every older client and the notified-run set already know.
+        #expect(Run.makeId(type: parsed.type, startedAt: parsed.startedAt, pid: parsed.pid)
+                == "morningBriefing-2026-04-20T12:03:00Z")
+        #expect(Run.makeId(type: parsed.type, startedAt: parsed.startedAt)
+                == Run.makeId(type: parsed.type, startedAt: parsed.startedAt, pid: nil))
+    }
+
+    @Test func secondsAndPidName() throws {
+        let parsed = try #require(Self.parse("dreaming-2026-04-18_22-00-31-4242"))
+        #expect(parsed.runnerScript == "run-dreaming.sh")
+        #expect(parsed.type == .dreaming)
+        #expect(parsed.pid == 4242)
+        let comps = Calendar(identifier: .gregorian).dateComponents(in: Self.ny, from: parsed.startedAt)
+        #expect([comps.hour, comps.minute, comps.second] == [22, 0, 31])
+        #expect(Run.makeId(type: parsed.type, startedAt: parsed.startedAt, pid: parsed.pid)
+                == "dreaming-2026-04-19T02:00:31Z-4242")
+    }
+
+    @Test func rejectsMalformedUniqueNames() {
+        for name in ["scout-2026-04-20_08-03-25", "scout-2026-04-20_08-03-5-4242", "scout-2026-04-20_08-03-25-0",
+                     "scout-2026-04-20_08-03-61-4242", "scout-2026-04-20_08-03-25-42a", "scout-2026-04-20_08-03-25-4242-1",
+                     "scout-2026-04-20_08-xx", "scout-2026-04-20_08--03"] {
+            #expect(Self.parse(name) == nil, "\(name)")
+        }
+    }
+
+    @Test func sameMinuteRunsGetDistinctIds() throws {
+        let names = ["scout-2026-04-20_08-03", "scout-2026-04-20_08-03-31-4242", "scout-2026-04-20_08-03-31-4243"]
+        let ids = try names.map { name in
+            let p = try #require(Self.parse(name))
+            return Run.makeId(type: p.type, startedAt: p.startedAt, pid: p.pid)
+        }
+        #expect(Set(ids).count == 3)
+    }
+
+    // MARK: - Sort order
+
+    @Test func sortsNewestFirstByMinuteSecondPid() throws {
+        let names = [
+            "scout-2026-04-20_08-03-31-4243",
+            "scout-2026-04-20_08-04",
+            "scout-2026-04-20_08-03",
+            "scout-2026-04-20_08-03-31-4242",
+            "scout-2026-04-20_08-03-00-17",
+            "scout-2026-04-20_08-03-45-12",
+        ]
+        let entries = try names.map { name -> (run: Run, pid: Int?) in
+            let p = try #require(Self.parse(name))
+            return (Self.makeRun(p.type, startedAt: p.startedAt, status: .success, pid: p.pid, log: "/x/\(name).log"), p.pid)
+        }
+        let order = SessionLogParser.newestFirst(entries).map { $0.logPath.deletingPathExtension().lastPathComponent }
+        #expect(order == [
+            "scout-2026-04-20_08-04",
+            "scout-2026-04-20_08-03-45-12",
+            "scout-2026-04-20_08-03-31-4243",
+            "scout-2026-04-20_08-03-31-4242",
+            "scout-2026-04-20_08-03-00-17",
+            "scout-2026-04-20_08-03",
+        ])
+    }
+
+    // MARK: - Lock skips don't orphan the live run
+
+    /// The runner skips on the session lock before it holds it: a lock skip
+    /// is evidence that the earlier run is alive, so it orphans nothing.
+    @Test func aLaterLockSkipDoesNotOrphan() {
+        let now = Date()
+        let live = Self.makeRun(.consolidation, startedAt: now.addingTimeInterval(-600), status: .running)
+        let skipped = Self.makeRun(.consolidation, startedAt: now.addingTimeInterval(-300), status: .skippedConcurrency)
+        let out = SessionLogParser.resolveStaleRunning([skipped, live])
+        #expect(out.first { $0.id == live.id }?.status == .running)
+        #expect(out.first { $0.id == skipped.id }?.status == .skippedConcurrency)
+    }
+
+    /// A budget skip happens after the runner took the lock, and so does a
+    /// finished run: either shows the earlier run no longer holds it.
+    @Test(arguments: [RunStatus.success, .failure, .timeout, .skippedBudget])
+    func aLaterRunPastTheLockStillOrphans(_ status: RunStatus) {
+        let now = Date()
+        let stuck = Self.makeRun(.consolidation, startedAt: now.addingTimeInterval(-600), status: .running)
+        let later = Self.makeRun(.consolidation, startedAt: now.addingTimeInterval(-300), status: status)
+        let out = SessionLogParser.resolveStaleRunning([later, stuck])
+        #expect(out.first { $0.id == stuck.id }?.status == .orphaned)
+    }
+
+    // MARK: - SessionsStore keeps fallback-named runs
+
+    /// The bug this guards: a run skipped by the session lock in the live
+    /// run's minute used to append its skip line to the live run's log. Now
+    /// it has its own seconds+PID log, which the store must keep as its own run.
+    @Test func storeKeepsASameMinuteSkipAsItsOwnRun() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scout-test-\(UUID().uuidString)", isDirectory: true)
+        let logs = dir.appendingPathComponent(SessionsStore.logsDir, isDirectory: true)
+        try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let defaults = try #require(UserDefaults(suiteName: "test-\(UUID().uuidString)"))
+        try VaultAccess.saveBookmark(for: dir, defaults: defaults)
+        let vault = VaultAccess(defaults: defaults)
+
+        // Filenames carry the device's local time; parse them the same way.
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .current
+        let minute = try #require(cal.date(from: DateComponents(year: 2026, month: 4, day: 20, hour: 8, minute: 3)))
+        let now = minute.addingTimeInterval(180)
+
+        try "=== SCOUT run starting ===\n"
+            .write(to: logs.appendingPathComponent("scout-2026-04-20_08-03.log"), atomically: true, encoding: .utf8)
+        try """
+        === SCOUT run starting ===
+        === Another SCOUT session running (PID 4100) — skipping ===
+        """.write(to: logs.appendingPathComponent("scout-2026-04-20_08-03-31-4242.log"), atomically: true, encoding: .utf8)
+        // A cost row inside both runs' match window belongs to the live run only.
+        let iso = ISO8601DateFormatter()
+        let costLine = #"{"ts":"\#(iso.string(from: minute.addingTimeInterval(60)))","ts_et":"t","type":"briefing","budget_cap":10,"budget_spent":0.5,"exit_code":0,"source":"session"}"#
+        try (costLine + "\n")
+            .write(to: logs.appendingPathComponent("usage-tracker.jsonl"), atomically: true, encoding: .utf8)
+        try "not a run\n".write(to: logs.appendingPathComponent("failures.log"), atomically: true, encoding: .utf8)
+
+        let result = SessionsStore.loadAll(vault: vault, now: now)
+
+        #expect(result.error == nil)
+        #expect(result.runs.map { $0.logPath.lastPathComponent }
+                == ["scout-2026-04-20_08-03-31-4242.log", "scout-2026-04-20_08-03.log"])
+        #expect(Set(result.runs.map(\.id)).count == 2)
+        let skip = result.runs[0]
+        let live = result.runs[1]
+        #expect(live.status == .running, "a skip in the live run's minute must not orphan or relabel it")
+        #expect(live.id == Run.makeId(type: .morningBriefing, startedAt: minute))
+        #expect(skip.status == .skippedConcurrency)
+        #expect(skip.id == Run.makeId(type: .morningBriefing, startedAt: minute.addingTimeInterval(31), pid: 4242))
+        #expect(live.cost == Decimal(string: "0.5"))
+        #expect(skip.cost == nil)
+    }
+}
+
 struct UsageEntryTests {
     @Test func decodesLegacyAndCurrentShapes() throws {
         let legacy = #"{"ts":"2026-04-16T11:02:02Z","ts_et":"2026-04-16 07:02 EDT","type":"morning-briefing","budget_cap":10,"budget_spent":0,"exit_code":0,"source":"runner"}"#

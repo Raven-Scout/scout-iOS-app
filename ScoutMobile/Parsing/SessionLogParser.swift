@@ -1,16 +1,26 @@
 import Foundation
 
-/// Parses `.scout-logs/<runner>-YYYY-MM-DD_HH-MM.log` filenames and bodies
-/// into `Run` values. Ported from the desktop app's SessionLogService
-/// (static parsing layer only — the iOS app polls instead of FSEvents).
+/// Parses `.scout-logs/<runner>-YYYY-MM-DD_HH-MM.log` (and
+/// `<runner>-YYYY-MM-DD_HH-MM-SS-PID.log`) filenames and bodies into `Run`
+/// values. Ported from the desktop app's SessionLogService (static parsing
+/// layer only — the iOS app polls instead of FSEvents).
 enum SessionLogParser {
 
     struct ParsedFilename: Equatable {
         let runnerScript: String
         let type: RunType
         let startedAt: Date
+        /// The runner's PID when the log has the seconds+PID name a run falls
+        /// back to when another run already claimed this minute's log; nil for
+        /// the minute-named log.
+        var pid: Int? = nil
     }
 
+    /// Accepts `<runner>-YYYY-MM-DD_HH-MM` (the run that claimed the minute's
+    /// log, and every log written before unique names) and
+    /// `<runner>-YYYY-MM-DD_HH-MM-SS-PID` (a later run in the same minute),
+    /// for runner scout, dreaming or research. Same rule as the desktop app's
+    /// `SessionLogService.parseFilename` (Raven-Scout/Scout#673).
     static func parseFilename(_ url: URL, timeZone: TimeZone = .current) -> ParsedFilename? {
         let name = url.deletingPathExtension().lastPathComponent
         guard let underscoreIdx = name.firstIndex(of: "_") else { return nil }
@@ -22,15 +32,28 @@ enum SessionLogParser {
         guard ["scout", "dreaming", "research"].contains(runner) else { return nil }
 
         let tailParts = tail.components(separatedBy: "-")
-        guard tailParts.count == 2 else { return nil }
+        guard tailParts.count == 2 || tailParts.count == 4,
+              tailParts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isASCII) && $0.allSatisfy(\.isNumber) })
+        else { return nil }
+        var second = 0
+        var pid: Int? = nil
+        if tailParts.count == 4 {
+            guard tailParts[2].count == 2, let s = Int(tailParts[2]), s < 60,
+                  let p = Int(tailParts[3]), p > 0
+            else { return nil }
+            second = s
+            pid = p
+        }
 
-        // Log filenames carry the producing machine's local wall-clock time.
+        // Log filenames carry the producing machine's local wall-clock time
+        // (`date "+%Y-%m-%d_%H-%M-%S"`; a minute-named log reads as second 0).
         var components = DateComponents()
         components.year = Int(headParts[1])
         components.month = Int(headParts[2])
         components.day = Int(headParts[3])
         components.hour = Int(tailParts[0])
         components.minute = Int(tailParts[1])
+        components.second = second
         components.timeZone = timeZone
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = timeZone
@@ -45,7 +68,17 @@ enum SessionLogParser {
         }()
 
         let type = deriveType(runner: runner, date: date, timeZone: timeZone)
-        return ParsedFilename(runnerScript: runnerScript, type: type, startedAt: date)
+        return ParsedFilename(runnerScript: runnerScript, type: type, startedAt: date, pid: pid)
+    }
+
+    /// Newest first by (minute, second, pid). `startedAt` already holds the
+    /// minute and second; a minute-named log (no PID) claimed its minute
+    /// first, so it sorts before every seconds+PID log of that minute.
+    static func newestFirst(_ runs: [(run: Run, pid: Int?)]) -> [Run] {
+        runs.sorted { a, b in
+            if a.run.startedAt != b.run.startedAt { return a.run.startedAt > b.run.startedAt }
+            return (a.pid ?? 0) > (b.pid ?? 0)
+        }.map(\.run)
     }
 
     static func deriveType(runner: String, date: Date, timeZone: TimeZone = .current) -> RunType {
@@ -153,10 +186,14 @@ enum SessionLogParser {
     }
 
     /// Demote `.running` entries when a newer run of the same type has a
-    /// terminal status.
+    /// terminal status, leaving out lock skips (`.skippedConcurrency`): the
+    /// runner skips on the session lock before it holds it, so a lock skip is
+    /// evidence that an earlier run is still alive, not that it died. Every
+    /// other skip happens after the runner took the lock, so, like a finished
+    /// run, it shows the earlier run no longer holds it.
     static func resolveStaleRunning(_ runs: [Run]) -> [Run] {
         var latestTerminal: [RunType: Date] = [:]
-        for r in runs where r.status != .running {
+        for r in runs where r.status != .running && r.status != .skippedConcurrency {
             let prev = latestTerminal[r.type] ?? .distantPast
             if r.startedAt > prev { latestTerminal[r.type] = r.startedAt }
         }
