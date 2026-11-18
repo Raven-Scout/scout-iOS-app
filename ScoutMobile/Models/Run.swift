@@ -76,6 +76,10 @@ enum RunStatus: String, Codable, Sendable {
 
     /// Terminal = the run will not change state anymore.
     var isTerminal: Bool { self != .running && self != .scheduled }
+
+    /// The runner decided not to run this session, so it started no Claude
+    /// session and spent nothing.
+    var isSkip: Bool { self == .skippedBudget || self == .skippedConcurrency }
 }
 
 struct DetectedError: Equatable, Hashable, Sendable {
@@ -99,10 +103,15 @@ struct Run: Identifiable, Equatable, Hashable, Sendable {
     let logSizeBytes: Int64
     let errorsDetected: [DetectedError]
 
-    static func makeId(type: RunType, startedAt: Date) -> String {
+    /// `<type>-<ISO 8601 start>`, plus `-<pid>` for a run whose log has the
+    /// seconds+PID name (a later run in the same minute). A minute-named log
+    /// keeps the id it always had, so already-notified run ids still match.
+    /// Same rule as the desktop app's `Run.makeId(type:startedAt:pid:)`.
+    static func makeId(type: RunType, startedAt: Date, pid: Int? = nil) -> String {
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime]
-        return "\(type.rawValue)-\(iso.string(from: startedAt))"
+        let base = "\(type.rawValue)-\(iso.string(from: startedAt))"
+        return pid.map { "\(base)-\($0)" } ?? base
     }
 
     var displayName: String {
